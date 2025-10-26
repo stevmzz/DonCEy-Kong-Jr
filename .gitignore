@@ -1,0 +1,45 @@
+# ============================================
+# .gitignore - DonCEy Kong Jr
+# ============================================
+
+# IDE - VSCode
+.vscode/
+*.code-workspace
+
+# IDE - CLion / IntelliJ
+.idea/
+*.iml
+cmake-build-debug/
+cmake-build-release/
+cmake-build-*/
+
+# BUILD - C (CMake)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+build/
+client/build/
+
+# BUILD - Java (Maven)
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+
+# COMPILADOS
+*.o
+*.class
+*.jar
+*.exe
+*.out
+
+# SISTEMA
+.DS_Store
+Thumbs.db
+*.swp
+*.log
+
+# AMBIENTE
+.env
+.env.local
