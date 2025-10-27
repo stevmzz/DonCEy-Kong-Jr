@@ -1,8 +1,11 @@
 package com.doncey.server;
 
+import com.doncey.admin.ServerGUI;
 import com.doncey.utils.Constants;
 import java.io.*;
 import java.net.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * El servidor escucha en un puerto específico y acepta conexiones
@@ -13,10 +16,18 @@ public class GameServer {
 
     private ServerSocket serverSocket; // Socket del servidor
     private Integer clientCounter = 0; // Contador de clientes conectados
+    private ServerGUI serverGUI; // Referencia a la GUI del servidor (puede ser null)
     
-    // Constructor
+    // Constructor sin GUI (para compatibilidad)
     public GameServer() throws IOException {
         this.serverSocket = new ServerSocket(Constants.SERVER_PORT);
+        this.serverGUI = null;
+    }
+    
+    // Constructor con GUI
+    public GameServer(ServerGUI serverGUI) throws IOException {
+        this.serverSocket = new ServerSocket(Constants.SERVER_PORT);
+        this.serverGUI = serverGUI;
     }
     
     /**
@@ -27,9 +38,9 @@ public class GameServer {
      * y lo ejecuta en un thread separado.
      */
     public void start() {
-        System.out.println("[SERVIDOR] Escuchando en puerto " + Constants.SERVER_PORT);
-        System.out.println("[SERVIDOR] Esperando conexiones de clientes...");
-        System.out.println();
+        log("Servidor iniciado");
+        log("Escuchando en puerto " + Constants.SERVER_PORT);
+        log("Esperando conexiones de clientes...");
         
         // LOOP INFINITO: Aceptar clientes
         while (true) {
@@ -43,10 +54,9 @@ public class GameServer {
                 }
                 
                 // Log de nueva conexión
-                System.out.println("[SERVIDOR] Nuevo cliente conectado (Total: " + clientCounter + ")");
-                
-                // Crear ClientHandler para este cliente
-                ClientHandler handler = new ClientHandler(clientSocket);
+                log("Nuevo cliente conectado (Total: " + clientCounter + ")");
+                // Crear ClientHandler para este cliente (pasando ServerGUI)
+                ClientHandler handler = new ClientHandler(clientSocket, serverGUI);
                 
                 // Ejecutar en un thread separado
                 Thread clientThread = new Thread(handler);
@@ -54,7 +64,7 @@ public class GameServer {
                 clientThread.start();
                 
             } catch (IOException e) {
-                System.err.println("[SERVIDOR] Error al aceptar cliente: " + e.getMessage());
+                log("[ERROR]: no se acepto el cliente: " + e.getMessage());
             }
         }
     }
@@ -63,7 +73,23 @@ public class GameServer {
     public void stop() throws IOException {
         if (serverSocket != null && !serverSocket.isClosed()) {
             serverSocket.close();
-            System.out.println("[SERVIDOR] Servidor detenido");
+            log("Servidor detenido");
+        }
+    }
+    
+    /**
+     * Envía logs a la consola Y a la GUI (si existe)
+     */
+    private void log(String message) {
+        String timestamp = new SimpleDateFormat("HH:mm:ss").format(new Date());
+        String logMessage = "[" + timestamp + "] > " + message;
+        
+        // Imprimir en consola
+        System.out.println(logMessage);
+        
+        // Enviar a GUI si existe
+        if (serverGUI != null) {
+            serverGUI.addServerLog(logMessage);
         }
     }
     
@@ -77,8 +103,8 @@ public class GameServer {
             GameServer server = new GameServer();
             server.start();
         } catch (IOException e) {
-            System.err.println("[ERROR] No se pudo iniciar el servidor: " + e.getMessage());
-            System.err.println("[ERROR] Verifica que el puerto " + Constants.SERVER_PORT + " esté disponible");
+            System.err.println("[ERROR]: No se pudo iniciar el servidor: " + e.getMessage());
+            System.err.println("[ERROR]: Verifica que el puerto " + Constants.SERVER_PORT + " este disponible");
         }
     }
 }

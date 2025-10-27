@@ -16,14 +16,14 @@ int connect_to_server(const char *ip, int port) {
     
     // Inicializar Winsock
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        printf("[ERROR] WSAStartup falló\n");
+        printf("[ERROR]: WSAStartup fallo\n");
         return -1;
     }
     
     // Crear socket TCP
     sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock == INVALID_SOCKET) {
-        printf("[ERROR] socket() falló con error %d\n", WSAGetLastError());
+        printf("[ERROR]: socket() fallo con error %d\n", WSAGetLastError());
         WSACleanup();
         return -1;
     }
@@ -34,7 +34,7 @@ int connect_to_server(const char *ip, int port) {
     
     // Convertir dirección IP de texto a formato binario
     if (inet_pton(AF_INET, ip, &serverAddr.sin_addr) <= 0) {
-        printf("[ERROR] Dirección IP inválida: %s\n", ip);
+        printf("[ERROR]: Direccion IP invalida: %s\n", ip);
         closesocket(sock);
         WSACleanup();
         return -1;
@@ -42,8 +42,8 @@ int connect_to_server(const char *ip, int port) {
     
     // Intentar conectar al servidor
     if (connect(sock, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        printf("[ERROR] No se pudo conectar a %s:%d\n", ip, port);
-        printf("[ERROR] Verifica que el servidor esté escuchando\n");
+        printf("[ERROR]: No se pudo conectar a %s:%d\n", ip, port);
+        printf("[ERROR]: Verifica que el servidor esté escuchando\n");
         closesocket(sock);
         WSACleanup();
         return -1;
@@ -66,7 +66,7 @@ int send_message(SOCKET sock, const char *msg) {
     
     // Verificar si hubo error en el envío
     if (bytesSent == SOCKET_ERROR) {
-        printf("[ERROR] send() falló con error %d\n", WSAGetLastError());
+        printf("[ERROR]: send() fallo con error %d\n", WSAGetLastError());
         return -1;
     }
     
@@ -89,10 +89,10 @@ char* recv_message(SOCKET sock) {
     if (recvSize <= 0) {
         if (recvSize == 0) {
             // recvSize == 0 significa que el servidor cerró la conexión
-            printf("[INFO] El servidor cerró la conexión\n");
+            printf("[INFO]: El servidor cerro la conexión\n");
         } else {
             // recvSize < 0 significa error
-            printf("[ERROR] recv() falló con error %d\n", WSAGetLastError());
+            printf("[ERROR]: recv() fallo con error %d\n", WSAGetLastError());
         }
         return NULL;
     }

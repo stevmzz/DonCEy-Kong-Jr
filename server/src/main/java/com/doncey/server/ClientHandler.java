@@ -1,22 +1,32 @@
 package com.doncey.server;
 
+import com.doncey.admin.ServerGUI;
 import java.io.*;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.concurrent.atomic.AtomicInteger;
 
 // Manejador de clientes
 public class ClientHandler implements Runnable {
 
     private Socket socket; // Socket de conexión con el cliente C
-    private static Integer clientCounter = 0; // Contador estático para asignar IDs únicos
+    private static AtomicInteger clientCounter = new AtomicInteger(0); // Contador estático de clientes
     private Integer clientId; // ID único del cliente
+    private ServerGUI serverGUI; // Referencia a la GUI del servidor (puede ser null)
     
-    // Constructor
+    // Constructor sin GUI (para compatibilidad)
     public ClientHandler(Socket socket) {
         this.socket = socket;
-        
-        synchronized (clientCounter) { 
-            this.clientId = ++clientCounter;
-        }
+        this.clientId = clientCounter.incrementAndGet();
+        this.serverGUI = null;
+    }
+    
+    // Constructor con GUI
+    public ClientHandler(Socket socket, ServerGUI serverGUI) {
+        this.socket = socket;
+        this.clientId = clientCounter.incrementAndGet();
+        this.serverGUI = serverGUI;
     }
     
     /**
@@ -31,21 +41,22 @@ public class ClientHandler implements Runnable {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream())); // Entrada
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true); // Salida
-            System.out.println("[Cliente #" + clientId + "] Conectado desde " + socket.getInetAddress().getHostAddress()); // Log
+            
+            log("[Cliente #" + clientId + "]: Conectado desde " + socket.getInetAddress().getHostAddress());
             
             String message; // Mensaje del cliente
             while ((message = in.readLine()) != null) {
-                System.out.println("[Cliente #" + clientId + "] Recibido: " + message);
+                log("[Cliente #" + clientId + "]: Recibido " + "( " + message + " )");
                 String response = processMessage(message);
                 out.println(response);
-                System.out.println("[Cliente #" + clientId + "] Enviado: " + response);
+                log("[Cliente #" + clientId + "]: Enviado " + "( " + response + " )");
             }
             
-            System.out.println("[Cliente #" + clientId + "] Desconectado");
+            log("[Cliente #" + clientId + "]: Desconectado");
             socket.close();
             
         } catch (IOException e) {
-            System.err.println("[Cliente #" + clientId + "] Error de I/O: " + e.getMessage());
+            log("[Cliente #" + clientId + "]: Error de I/O: " + e.getMessage());
         }
     }
     
@@ -58,5 +69,23 @@ public class ClientHandler implements Runnable {
     private String processMessage(String message) {
         // Aquí iría la lógica de procesamiento de mensajes 
         return message;
+    }
+    
+    /**
+     * Envía logs a la consola Y a la GUI (si existe)
+     * 
+     * @param message Mensaje de log
+     */
+    private void log(String message) {
+        String timestamp = new SimpleDateFormat("HH:mm:ss").format(new Date());
+        String logMessage = "[" + timestamp + "] > " + message;
+        
+        // Imprimir en consola
+        System.out.println(logMessage);
+        
+        // Enviar a GUI si existe
+        if (serverGUI != null) {
+            serverGUI.addServerLog(logMessage);
+        }
     }
 }
