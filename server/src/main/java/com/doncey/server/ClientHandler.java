@@ -44,6 +44,11 @@ public class ClientHandler implements Runnable {
             
             log("[Cliente #" + clientId + "]: Conectado desde " + socket.getInetAddress().getHostAddress());
             
+            // Notificar a la GUI que se conectó un jugador
+            if (serverGUI != null) {
+                serverGUI.notifyPlayerConnected(clientId);
+            }
+            
             String message; // Mensaje del cliente
             while ((message = in.readLine()) != null) {
                 log("[Cliente #" + clientId + "]: Recibido " + "( " + message + " )");
@@ -53,10 +58,21 @@ public class ClientHandler implements Runnable {
             }
             
             log("[Cliente #" + clientId + "]: Desconectado");
+            
+            // Notificar a la GUI que se desconectó un jugador
+            if (serverGUI != null) {
+                serverGUI.notifyPlayerDisconnected(clientId);
+            }
+            
             socket.close();
             
         } catch (IOException e) {
             log("[Cliente #" + clientId + "]: Error de I/O: " + e.getMessage());
+            
+            // Notificar desconexión también en caso de error
+            if (serverGUI != null) {
+                serverGUI.notifyPlayerDisconnected(clientId);
+            }
         }
     }
     

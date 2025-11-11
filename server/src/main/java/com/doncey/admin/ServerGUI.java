@@ -39,6 +39,20 @@ public class ServerGUI extends JFrame {
         }
     }
     
+    // Notifica que un jugador se conectó
+    public void notifyPlayerConnected(Integer playerId) {
+        if (playersPanel != null) {
+            playersPanel.addPlayer(playerId);
+        }
+    }
+    
+    // Notifica que un jugador se desconectó
+    public void notifyPlayerDisconnected(Integer playerId) {
+        if (playersPanel != null) {
+            playersPanel.removePlayer(playerId);
+        }
+    }
+    
     // Retorna el panel del servidor
     public ServerPanel getServerPanel() {
         return serverPanel;
