@@ -1,11 +1,13 @@
 package com.doncey.server;
 
-import com.doncey.admin.ServerGUI;
-import com.doncey.utils.Constants;
-import java.io.*;
-import java.net.*;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+
+import com.doncey.admin.ServerGUI;
+import com.doncey.utils.Constants;
 
 /**
  * El servidor escucha en un puerto específico y acepta conexiones
@@ -57,6 +59,7 @@ public class GameServer {
                 log("Nuevo cliente conectado (Total: " + clientCounter + ")");
                 // Crear ClientHandler para este cliente (pasando ServerGUI)
                 ClientHandler handler = new ClientHandler(clientSocket, serverGUI);
+                GameWorld.getInstance().registerClient(handler);
                 
                 // Ejecutar en un thread separado
                 Thread clientThread = new Thread(handler);

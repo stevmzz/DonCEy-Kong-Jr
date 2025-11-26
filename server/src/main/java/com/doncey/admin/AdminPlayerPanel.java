@@ -1,8 +1,25 @@
 package com.doncey.admin;
 
-import javax.swing.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridLayout;
+import java.awt.Insets;
+
+import javax.swing.BorderFactory;
+import javax.swing.DefaultListModel;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
-import java.awt.*;
+
+import com.doncey.server.Fruit;
 
 /**
  * Panel de administración de un jugador específico
@@ -361,19 +378,48 @@ public class AdminPlayerPanel extends JPanel {
      * @param heightY Altura Y
      */
     private void addFruit(String type, int heightX, int heightY) {
-        String fruitEntry = type + " (X:" + heightX + " Y:" + heightY + ")";
-        fruitsModel.addElement(fruitEntry);
+    int points = 0;
+    switch (type.toUpperCase()) {
+        case "MANGO": points = 50; break;
+        case "BANANO": points = 30; break;
+        case "MANZANA": points = 20; break;
+        default: points = 10; break;
     }
+
+    // Crear en el GameWorld (esto enviará SPAWN_FRUIT a todos los clientes)
+    Fruit f = com.doncey.server.GameWorld.getInstance().spawnFruit(type, heightX, heightY, points);
+
+    // Añadir entrada en la lista local del administrador para visual
+    String fruitEntry = type + " (ID:" + f.getId() + " X:" + heightX + " Y:" + heightY + " P:" + points + ")";
+    fruitsModel.addElement(fruitEntry);
+}
     
     // Elimina la fruta seleccionada de la lista
     private void deleteFruit() {
-        int selectedIndex = fruitsList.getSelectedIndex();
-        if (selectedIndex != -1) {
-            fruitsModel.remove(selectedIndex);
-            deleteFruitButton.setEnabled(false);
+    int selectedIndex = fruitsList.getSelectedIndex();
+    if (selectedIndex != -1) {
+        String entry = fruitsModel.getElementAt(selectedIndex);
+        // Suponemos formato con "ID:<id>"
+        int id = -1;
+        int idx = entry.indexOf("ID:");
+        if (idx != -1) {
+            try {
+                int end = entry.indexOf(' ', idx);
+                if (end == -1) end = entry.length();
+                String idStr = entry.substring(idx + 3, end).replaceAll("[^0-9]", "");
+                id = Integer.parseInt(idStr);
+            } catch (Exception ignored) {}
         }
+        if (id != -1) {
+            boolean removed = com.doncey.server.GameWorld.getInstance().removeFruit(id);
+            // Si no existía en GameWorld, igual borramos visualmente
+        }
+        fruitsModel.remove(selectedIndex);
+        deleteFruitButton.setEnabled(false);
     }
+}
     
+
     /**
      * Agrega un cocodrilo a la lista
      * 
