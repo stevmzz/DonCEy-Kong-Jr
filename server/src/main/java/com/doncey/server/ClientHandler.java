@@ -52,7 +52,8 @@ public class ClientHandler implements Runnable {
             
             log("[Cliente #" + clientId + "]: Conectado desde " + socket.getInetAddress().getHostAddress());
             
-            // registrar en GameWorld (envía estado actual)
+            // registrar en GameWorld
+            GameWorld.getInstance().registerPlayer(clientId, this);
             GameWorld.getInstance().registerClient(this);
 
             // Notificar a la GUI que se conectó un jugador
@@ -96,8 +97,13 @@ public class ClientHandler implements Runnable {
      * @return Respuesta a enviar al cliente (o null si no corresponde enviar respuesta)
      */
     private String processMessage(String message) {
-        // Mensajes esperados: EAT_FRUIT <clientId> <fruitId>
+        // Mensajes de movimiento: MOVE_LEFT, MOVE_RIGHT, STOP_MOVING
         try {
+            if (message.startsWith("MOVE_LEFT") || message.startsWith("MOVE_RIGHT") || message.startsWith("STOP_MOVING")) {
+                GameWorld.getInstance().processPlayerCommand(clientId, message);
+                return null; // No responder, el servidor broadcast la posición
+            }
+            
             if (message.startsWith("EAT_FRUIT")) {
                 String[] parts = message.split("\\s+");
                 if (parts.length >= 3) {
@@ -150,6 +156,7 @@ public class ClientHandler implements Runnable {
         try {
             running = false;
             // quitar del GameWorld
+            GameWorld.getInstance().unregisterPlayer(clientId);
             GameWorld.getInstance().unregisterClient(this);
             if (serverGUI != null) serverGUI.notifyPlayerDisconnected(clientId);
             if (in != null) try { in.close(); } catch (IOException ignored) {}
