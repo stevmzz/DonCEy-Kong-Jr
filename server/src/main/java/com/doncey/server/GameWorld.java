@@ -120,6 +120,23 @@ public class GameWorld {
         }
     }
 
+    /**
+     * Notifica que un jugador murió
+     * Envía mensaje GAME_OVER a todos los clientes
+     * 
+     * @param playerId ID del jugador que murió
+     */
+    public void playerDied(int playerId) {
+        Player player = getPlayer(playerId);
+        if (player != null) {
+            System.out.println("[GAMEWORLD] Jugador #" + playerId + " murió");
+            broadcast("GAME_OVER " + playerId);
+            
+            // Notificar observadores del patrón Observer
+            eventPublisher.notifyPlayerDisconnected(playerId);
+        }
+    }
+
     // ======== CLIENTES ========
     public void registerClient(ClientHandler ch) {
         clients.add(ch);

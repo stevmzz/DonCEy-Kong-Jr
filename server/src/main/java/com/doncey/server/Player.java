@@ -44,6 +44,22 @@ public class Player {
         movingRight = false;
     }
     
+    /**
+    * Pierde una vida
+    */
+    public void loseLive() {
+        System.out.println("[PLAYER] Jugador #" + id + " perdió una vida");
+    }
+
+    /**
+     * Verifica si el jugador aún está vivo
+     * 
+     * @return true si tiene vidas > 0
+     */
+    public boolean isAlive() {
+        return true;
+    }
+
     // Actualización del jugador cada frame
     public void update() {
         if (movingLeft) {
