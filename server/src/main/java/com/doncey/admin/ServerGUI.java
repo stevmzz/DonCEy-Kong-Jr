@@ -62,4 +62,10 @@ public class ServerGUI extends JFrame {
     public PlayersPanel getPlayersPanel() {
         return playersPanel;
     }
+
+    public void removeFruitFromList(int fruitId) {
+    if (playersPanel != null) {
+        playersPanel.removeFruitFromAdminPanel(fruitId);
+    }
+}
 }

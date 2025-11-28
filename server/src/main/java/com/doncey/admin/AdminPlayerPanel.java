@@ -17,6 +17,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 
 import com.doncey.server.Fruit;
@@ -418,7 +419,19 @@ public class AdminPlayerPanel extends JPanel {
         deleteFruitButton.setEnabled(false);
     }
 }
-    
+
+    public void removeFruitById(int fruitId) {
+    SwingUtilities.invokeLater(() -> {
+        for (int i = 0; i < fruitsModel.size(); i++) {
+            String entry = fruitsModel.getElementAt(i);
+            if (entry.contains("ID:" + fruitId)) {
+                fruitsModel.remove(i);
+                deleteFruitButton.setEnabled(false);
+                break;
+            }
+        }
+    });
+}
 
     /**
      * Agrega un cocodrilo a la lista

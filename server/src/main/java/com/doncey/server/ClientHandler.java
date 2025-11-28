@@ -115,11 +115,15 @@ public class ClientHandler implements Runnable {
                         // remueve fruta del mundo -> broadcast REMOVE_FRUIT
                         boolean removed = GameWorld.getInstance().removeFruit(fid);
                         if (removed) {
-                            // informar puntaje (broadcast)
+                            if (serverGUI != null) {
+                                serverGUI.removeFruitFromList(fid);
+                            }
+
+                            // broadcast de puntaje
                             GameWorld.getInstance().broadcast(
                                 String.format("PLAYER_SCORE %d %d", cid, f.getPoints())
                             );
-                            // responder OK al cliente que pidió comerla
+
                             return "EAT_OK " + fid + " " + f.getPoints();
                         } else {
                             return "EAT_FAIL " + fid;
