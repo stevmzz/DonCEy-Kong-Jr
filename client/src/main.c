@@ -29,6 +29,7 @@ static int player_id = -1;
 static SOCKET global_sock = -1;
 static volatile int receiver_running = 0;
 
+
 void init_fruits() {
     int i;
     for (i = 0; i < MAX_FRUITS; ++i) fruits[i].active = 0;
