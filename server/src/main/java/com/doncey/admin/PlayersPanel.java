@@ -214,6 +214,12 @@ public class PlayersPanel extends JPanel {
         }
     }
     
+    public void removeFruitFromAdminPanel(int fruitId) {
+    if (currentAdminPanel != null) {
+        currentAdminPanel.removeFruitById(fruitId);
+    }
+}
+
     // Volver a la lista de jugadores
     public void showPlayersList() {
         playersList.clearSelection();

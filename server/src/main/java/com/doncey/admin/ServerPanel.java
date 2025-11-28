@@ -37,37 +37,30 @@ public class ServerPanel extends JPanel {
     
     // Header: Estado y Hora
     private JPanel createHeaderPanel() {
-        // Panel principal
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(BG_SECONDARY);
         panel.setBorder(new EmptyBorder(48, 32, 48, 32));
         
-        // Panel de estado
         JPanel statusPanel = new JPanel(new GridLayout(1, 2, 50, 0));
         statusPanel.setBackground(BG_SECONDARY);
         statusPanel.setOpaque(false);
         statusPanel.add(createStatusWidget("ESTADO", "● ONLINE", WHITE_LIGHT));
         statusPanel.add(createStatusWidget("HORA", getCurrentTime(), GRAY_LIGHT));
         
-        // Referencia para actualizar hora
         timeValueLabel = (JLabel) ((JPanel) statusPanel.getComponent(1)).getComponent(1);
         new Timer(1000, e -> timeValueLabel.setText(getCurrentTime())).start();
         
-        // Agregar al panel principal
         panel.add(statusPanel, BorderLayout.WEST);
         panel.setBorder(BorderFactory.createMatteBorder(20, 20, 20, 0, BG_SECONDARY));
         return panel;
     }
     
-    // Widget de status
     private JPanel createStatusWidget(String label, String value, Color color) {
-        // Contenedor del widget de status
         JPanel widget = new JPanel();
         widget.setLayout(new BoxLayout(widget, BoxLayout.Y_AXIS));
         widget.setBackground(BG_SECONDARY);
         widget.setOpaque(false);
         
-        // Etiquetas
         JLabel labelText = new JLabel(label);
         labelText.setFont(FONT_LABEL);
         labelText.setForeground(TEXT_SECONDARY);
@@ -83,29 +76,24 @@ public class ServerPanel extends JPanel {
         return widget;
     }
     
-    // Panel de logs
     private JPanel createLogsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(BG_PRIMARY);
         
-        // Línea superior
         JPanel topDivider = new JPanel();
         topDivider.setBackground(WHITE_PURE);
         topDivider.setPreferredSize(new Dimension(0, 1));
         panel.add(topDivider, BorderLayout.NORTH);
         
-        // Contenedor
         JPanel container = new JPanel(new BorderLayout());
         container.setBackground(BG_PRIMARY);
         container.setBorder(new EmptyBorder(20, 32, 20, 32));
         
-        // Etiqueta superior
         JLabel topLabel = new JLabel("┌─ REGISTROS DE ACTIVIDAD ─────────────────────────────────────────┐");
         topLabel.setFont(FONT_LABEL);
         topLabel.setForeground(WHITE_PURE);
         topLabel.setOpaque(false);
         
-        // Area de logs
         logArea = new JTextArea();
         logArea.setEditable(false);
         logArea.setFont(FONT_LOGS);
@@ -115,7 +103,6 @@ public class ServerPanel extends JPanel {
         logArea.setLineWrap(true);
         logArea.setMargin(new Insets(16, 16, 16, 16));
         
-        // ScrollPane
         JScrollPane scrollPane = new JScrollPane(logArea);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -130,13 +117,11 @@ public class ServerPanel extends JPanel {
         scrollPane.getViewport().setOpaque(false);
         scrollPane.setBorder(null);
         
-        // Contenedor de logs
         JPanel logContainer = new JPanel(new BorderLayout());
         logContainer.setBackground(BG_PRIMARY);
         logContainer.setBorder(BorderFactory.createMatteBorder(2, 2, 2, 2, WHITE_LIGHT));
         logContainer.add(scrollPane, BorderLayout.CENTER);
         
-        // Estructura principal
         JPanel mainContainer = new JPanel(new BorderLayout());
         mainContainer.setBackground(BG_PRIMARY);
         mainContainer.add(topLabel, BorderLayout.NORTH);
@@ -152,7 +137,6 @@ public class ServerPanel extends JPanel {
         container.add(mainContainer, BorderLayout.CENTER);
         panel.add(container, BorderLayout.CENTER);
         
-        // Línea inferior
         JPanel bottomDivider = new JPanel();
         bottomDivider.setBackground(WHITE_PURE);
         bottomDivider.setPreferredSize(new Dimension(0, 1));
@@ -161,7 +145,6 @@ public class ServerPanel extends JPanel {
         return panel;
     }
     
-    // Panel de botones
     private JPanel createFooterPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(BG_SECONDARY);
@@ -180,7 +163,6 @@ public class ServerPanel extends JPanel {
         return panel;
     }
     
-    // Botón con hover
     private JButton createButton(String text, Color primary, Color secondary, java.awt.event.ActionListener action) {
         JButton button = new JButton(text);
         button.setFont(FONT_BUTTON);
@@ -217,7 +199,6 @@ public class ServerPanel extends JPanel {
         return button;
     }
     
-    // Agregar log
     public void addLog(String message) {
         SwingUtilities.invokeLater(() -> {
             String formatted = message.startsWith(">") || message.startsWith("[") 
@@ -228,7 +209,6 @@ public class ServerPanel extends JPanel {
         });
     }
     
-    // Limpiar logs
     private void clearLogs() {
         if (JOptionPane.showConfirmDialog(this,
             "¿ESTÁ SEGURO DE PURGAR TODOS LOS REGISTROS?\nESTA ACCIÓN NO SE PUEDE DESHACER.",
@@ -240,7 +220,6 @@ public class ServerPanel extends JPanel {
         }
     }
     
-    // Exportar logs
     private void downloadLogs() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("EXTRAER DATOS DEL SISTEMA");
@@ -263,7 +242,6 @@ public class ServerPanel extends JPanel {
         }
     }
     
-    // Obtener hora
     private String getCurrentTime() {
         return new SimpleDateFormat("HH:mm:ss").format(new Date());
     }
