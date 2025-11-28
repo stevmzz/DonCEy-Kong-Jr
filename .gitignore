@@ -43,3 +43,9 @@ Thumbs.db
 # AMBIENTE
 .env
 .env.local
+/server/src/main/java/com/doncey/oracleJdk-21/bin
+server/src/main/java/com/doncey/oracleJdk-21/bin/awt.dll
+server/src/main/java/com/doncey/oracleJdk-21/bin/extnet.dll
+server/src/main/java/com/doncey/oracleJdk-21/bin/awt.dll
+server/src/main/java/com/doncey/oracleJdk-21/bin/fontmanager.dll
+/server/src/main/java/com/doncey/oracleJdk-21

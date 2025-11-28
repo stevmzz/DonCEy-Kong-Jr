@@ -18,17 +18,17 @@
 #include "player_screen.h"
 #include "spectator_screen.h"
 #include "client_protocol.h"
+#include "input_handler.h"
 
 #define MAX_MSG_LEN 1024
 
-// storage de frutas recibidas
 static ServerFruit fruits[MAX_FRUITS];
 static CRITICAL_SECTION fruits_lock;
+static PlayerScreen* player_screen = NULL;
 static int player_id = -1;
 static SOCKET global_sock = -1;
 static volatile int receiver_running = 0;
 
-// helpers
 void init_fruits() {
     int i;
     for (i = 0; i < MAX_FRUITS; ++i) fruits[i].active = 0;
@@ -39,14 +39,12 @@ void add_or_replace_fruit_from_server(int id, int x, int y, const char* type, in
     int i;
     for (i = 0; i < MAX_FRUITS; ++i) {
         if (fruits[i].active && fruits[i].id == id) {
-            // update
             fruits[i].x = x; fruits[i].y = y; fruits[i].points = points;
             strncpy(fruits[i].type, type, sizeof(fruits[i].type)-1);
             LeaveCriticalSection(&fruits_lock);
             return;
         }
     }
-    // insert
     for (i = 0; i < MAX_FRUITS; ++i) {
         if (!fruits[i].active) {
             fruits[i].active = 1;
@@ -74,7 +72,6 @@ void remove_fruit_from_server(int id) {
     LeaveCriticalSection(&fruits_lock);
 }
 
-// parsea mensajes como "SPAWN_FRUIT 12 100 200 MANGO 50"
 void handle_server_message(const char* msg) {
     if (strncmp(msg, "ASSIGN_ID", 9) == 0) {
         int id = -1;
@@ -84,6 +81,17 @@ void handle_server_message(const char* msg) {
         }
         return;
     }
+    
+    if (strncmp(msg, "PLAYER_POS", 10) == 0) {
+        int id, x, y;
+        if (sscanf(msg + 10, "%d %d %d", &id, &x, &y) == 3) {
+            if (player_screen != NULL) {
+                PlayerScreen_UpdatePlayerPos(player_screen, id, x, y);
+            }
+        }
+        return;
+    }
+    
     if (strncmp(msg, "SPAWN_FRUIT", 11) == 0) {
         int fid, x, y, pts;
         char type[64];
@@ -108,10 +116,8 @@ void handle_server_message(const char* msg) {
         }
         return;
     }
-    // otros mensajes...
 }
 
-// hilo receptor
 DWORD WINAPI receiver_thread_func(LPVOID param) {
     SOCKET sock = (SOCKET)param;
     char *msg;
@@ -119,26 +125,34 @@ DWORD WINAPI receiver_thread_func(LPVOID param) {
     while (receiver_running) {
         msg = recv_message(sock);
         if (msg == NULL) {
-            // desconexión o error
             printf("[CLIENT] recv returned NULL, stopping receiver\n");
             break;
         }
-        // msg es buffer estático devuelto por recv_message
         handle_server_message(msg);
     }
     receiver_running = 0;
     return 0;
 }
 
-// enviar EAT_FRUIT <clientId> <fruitId>
 void send_eat_fruit(SOCKET sock, int fid) {
     if (sock == -1 || player_id == -1) return;
     char buf[MAX_MSG_LEN];
-    snprintf(buf, MAX_MSG_LEN, "EAT_FRUIT %d %d\n", player_id, fid);
-    send_message(sock, buf); // ya adjunta newline en send_message
+    snprintf(buf, MAX_MSG_LEN, "EAT_FRUIT %d %d", player_id, fid);
+    send_message(sock, buf);
 }
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+// DIBUJAR FRUTAS CON FORMAS Y COLORES
+    snprintf(buf, MAX_MSG_LEN, "EAT_FRUIT %d %d", player_id, fid);
+    send_message(sock, buf);
+}
+
+=======
 // dibuja las frutas actuales
+>>>>>>> parent of 4d0f5ae (frutas full)
+=======
+>>>>>>> 6f71c68e1a6ad8c716bc679dc172635c6abcbb39
 void draw_fruits() {
     EnterCriticalSection(&fruits_lock);
     int i;
@@ -158,7 +172,6 @@ void draw_fruits() {
 int main(void) {
     SOCKET sock;
     
-    // init crit section
     InitializeCriticalSection(&fruits_lock);
     init_fruits();
 
@@ -173,7 +186,6 @@ int main(void) {
     } else {
         printf("[CLIENTE]: Conectado al servidor\n\n");
         global_sock = sock;
-        // lanzar hilo receptor
         CreateThread(NULL, 0, receiver_thread_func, (LPVOID)sock, 0, NULL);
     }
     
@@ -183,18 +195,16 @@ int main(void) {
     
     StateManager* state_manager = StateManager_Create();
     MainScreen* main_screen = MainScreen_Create();
-    PlayerScreen* player_screen = PlayerScreen_Create();
+    player_screen = PlayerScreen_Create();
     SpectatorScreen* spectator_screen = SpectatorScreen_Create();
     
-    printf("[INICIALIZACIÓN]: Todos los recursos gráficos creados\n\n");
+    printf("[INICIALIZACION]: Todos los recursos graficos creados\n\n");
     
     while (!WindowShouldClose()) {
         GameState current_state = StateManager_GetCurrentState(state_manager);
         
-        // entrada del mouse para comer frutas (solo en PLAYER)
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && current_state == STATE_PLAYER) {
             int mx = GetMouseX(), my = GetMouseY();
-            // buscar fruta cercana
             EnterCriticalSection(&fruits_lock);
             int i;
             for (i = 0; i < MAX_FRUITS; ++i) {
@@ -203,7 +213,6 @@ int main(void) {
                 int dy = my - fruits[i].y;
                 int dist2 = dx*dx + dy*dy;
                 if (dist2 <= (20*20)) {
-                    // comer fruta localmente (optimista)
                     int fid = fruits[i].id;
                     fruits[i].active = 0;
                     LeaveCriticalSection(&fruits_lock);
@@ -219,6 +228,7 @@ int main(void) {
                 MainScreen_HandleInput(main_screen, state_manager);
                 break;
             case STATE_PLAYER:
+                InputHandler_Update(global_sock, player_id);
                 PlayerScreen_HandleInput(player_screen, state_manager);
                 break;
             case STATE_SPECTATOR:
@@ -234,13 +244,13 @@ int main(void) {
         if (StateManager_HasStateChanged(state_manager)) {
             switch (current_state) {
                 case STATE_MAIN_MENU:
-                    printf("[ESTADO]: Cambió a MAIN_MENU\n");
+                    printf("[ESTADO]: Cambio a MAIN_MENU\n");
                     break;
                 case STATE_PLAYER:
-                    printf("[ESTADO]: Cambió a PLAYER\n");
+                    printf("[ESTADO]: Cambio a PLAYER\n");
                     break;
                 case STATE_SPECTATOR:
-                    printf("[ESTADO]: Cambió a SPECTATOR\n");
+                    printf("[ESTADO]: Cambio a SPECTATOR\n");
                     break;
                 case STATE_EXIT:
                     break;
@@ -269,15 +279,12 @@ int main(void) {
                 break;
 
             case STATE_PLAYER:
-                // primero deja que el player render haga su ClearBackground() y UI
                 PlayerScreen_Render(player_screen);
-                // luego dibujamos las frutas recibidas del servidor (por encima de la UI)
                 draw_fruits();
                 break;
 
             case STATE_SPECTATOR:
                 SpectatorScreen_Render(spectator_screen);
-                // si quieres que el espectador vea las frutas:
                 draw_fruits();
                 break;
 
@@ -292,7 +299,6 @@ int main(void) {
         }
     }
 
-    // cleanup
     receiver_running = 0;
     Sleep(100);
     if (global_sock != -1) close_connection(global_sock);

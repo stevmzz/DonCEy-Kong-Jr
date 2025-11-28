@@ -13,4 +13,12 @@ typedef struct {
     int active;
 } ServerFruit;
 
+typedef struct {
+    int id;
+    int x;
+    int y;
+    int width;
+    int height;
+} GamePlayer;
+
 #endif

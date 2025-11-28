@@ -16,6 +16,7 @@ add_executable(client
     src/main.c
     src/network.c
     src/state_manager.c
+    src/input_handler.c
     src/screen/main_screen.c
     src/screen/player_screen.c
     src/screen/spectator_screen.c

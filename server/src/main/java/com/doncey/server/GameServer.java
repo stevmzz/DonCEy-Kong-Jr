@@ -13,12 +13,18 @@ import com.doncey.utils.Constants;
  * El servidor escucha en un puerto específico y acepta conexiones
  * de clientes C. Cada cliente es manejado en un thread separado
  * por una instancia de ClientHandler.
+ * 
+ * También ejecuta un game loop para actualizar la lógica del juego
  */
 public class GameServer {
 
     private ServerSocket serverSocket; // Socket del servidor
     private Integer clientCounter = 0; // Contador de clientes conectados
     private ServerGUI serverGUI; // Referencia a la GUI del servidor (puede ser null)
+    
+    private Thread gameLoopThread; // Thread del game loop
+    private volatile boolean running = true; // Flag para detener el servidor
+    private static final int GAME_UPDATE_RATE = 50; // ms (20 FPS)
     
     // Constructor sin GUI (para compatibilidad)
     public GameServer() throws IOException {
@@ -44,8 +50,13 @@ public class GameServer {
         log("Escuchando en puerto " + Constants.SERVER_PORT);
         log("Esperando conexiones de clientes...");
         
+        // Iniciar game loop
+        gameLoopThread = new Thread(this::gameLoop);
+        gameLoopThread.setName("GameLoopThread");
+        gameLoopThread.start();
+        
         // LOOP INFINITO: Aceptar clientes
-        while (true) {
+        while (running) {
             try {
                 // Aceptar conexión de un cliente
                 Socket clientSocket = serverSocket.accept();
@@ -59,7 +70,6 @@ public class GameServer {
                 log("Nuevo cliente conectado (Total: " + clientCounter + ")");
                 // Crear ClientHandler para este cliente (pasando ServerGUI)
                 ClientHandler handler = new ClientHandler(clientSocket, serverGUI);
-                GameWorld.getInstance().registerClient(handler);
                 
                 // Ejecutar en un thread separado
                 Thread clientThread = new Thread(handler);
@@ -67,13 +77,47 @@ public class GameServer {
                 clientThread.start();
                 
             } catch (IOException e) {
-                log("[ERROR]: no se acepto el cliente: " + e.getMessage());
+                if (running) {
+                    log("[ERROR]: no se acepto el cliente: " + e.getMessage());
+                }
             }
         }
     }
     
+    /**
+     * Game Loop - actualiza la lógica del juego a intervalos regulares
+     */
+    private void gameLoop() {
+        log("Game Loop iniciado (actualización cada " + GAME_UPDATE_RATE + "ms)");
+        
+        while (running) {
+            long startTime = System.currentTimeMillis();
+            
+            try {
+                // Actualizar lógica del juego
+                GameWorld.getInstance().updateGameLogic();
+                
+                long elapsedTime = System.currentTimeMillis() - startTime;
+                long sleepTime = GAME_UPDATE_RATE - elapsedTime;
+                
+                if (sleepTime > 0) {
+                    Thread.sleep(sleepTime);
+                }
+                
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                log("[ERROR]: Error en game loop: " + e.getMessage());
+            }
+        }
+        
+        log("Game Loop detenido");
+    }
+    
     // Detiene el servidor
     public void stop() throws IOException {
+        running = false;
         if (serverSocket != null && !serverSocket.isClosed()) {
             serverSocket.close();
             log("Servidor detenido");

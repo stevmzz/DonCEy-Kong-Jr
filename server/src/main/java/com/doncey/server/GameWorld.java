@@ -7,12 +7,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * GameWorld mantiene el estado de frutas (spawn/remove) y permite
  * notificar a los clientes conectados sobre estas acciones.
+ * 
+ * También mantiene el estado de los jugadores conectados
  */
 public class GameWorld {
     private static GameWorld instance = null;
 
     private final AtomicInteger fruitIdCounter = new AtomicInteger(0);
     private final Map<Integer, Fruit> fruits = new ConcurrentHashMap<>();
+    private final Map<Integer, Player> players = new ConcurrentHashMap<>();
     // Lista de client handlers registrados para broadcast
     private final Set<ClientHandler> clients = Collections.synchronizedSet(new HashSet<>());
 
@@ -23,6 +26,7 @@ public class GameWorld {
         return instance;
     }
 
+    // ======== FRUTAS ========
     public Fruit spawnFruit(String type, int x, int y, int points) {
         int id = fruitIdCounter.incrementAndGet();
         Fruit f = new Fruit(id, x, y, type, points);
@@ -50,7 +54,50 @@ public class GameWorld {
         return fruits.values();
     }
 
-    // registro de clientes para broadcast
+    // ======== JUGADORES ========
+    public void registerPlayer(int playerId, ClientHandler handler) {
+        Player player = new Player(playerId, 100, 400);
+        players.put(playerId, player);
+        System.out.println("[GAMEWORLD] Jugador registrado: " + player);
+    }
+    
+    public void unregisterPlayer(int playerId) {
+        players.remove(playerId);
+        System.out.println("[GAMEWORLD] Jugador removido: " + playerId);
+    }
+    
+    public Player getPlayer(int playerId) {
+        return players.get(playerId);
+    }
+    
+    // Procesar comandos de movimiento del cliente
+    public void processPlayerCommand(int playerId, String command) {
+        Player player = getPlayer(playerId);
+        if (player == null) return;
+        
+        String[] parts = command.split("\\s+");
+        if (parts.length == 0) return;
+        
+        String action = parts[0].toUpperCase();
+        
+        if (action.equals("MOVE_LEFT")) {
+            player.moveLeft();
+        } else if (action.equals("MOVE_RIGHT")) {
+            player.moveRight();
+        } else if (action.equals("STOP_MOVING")) {
+            player.stopMoving();
+        }
+    }
+    
+    // Actualizar lógica del juego (cada frame)
+    public void updateGameLogic() {
+        for (Player player : players.values()) {
+            player.update();
+            broadcast(player.getPositionMessage());
+        }
+    }
+
+    // ======== CLIENTES ========
     public void registerClient(ClientHandler ch) {
         clients.add(ch);
         // al registrarse, enviar estado actual (spawn de todas las frutas)
