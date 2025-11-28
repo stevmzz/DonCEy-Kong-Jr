@@ -21,6 +21,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 
 import com.doncey.server.Fruit;
+import com.doncey.server.GameWorld;
 
 /**
  * Panel de administración de un jugador específico
@@ -39,6 +40,7 @@ public class AdminPlayerPanel extends JPanel {
     private static final Color GRAY_MEDIUM = new Color(100, 100, 100);
     private static final Color TEXT_SECONDARY = new Color(180, 180, 180);
     private static final Color COLOR_ACCENT = new Color(100, 150, 255);
+    private static final Color COLOR_DANGER = new Color(255, 100, 100);
     
     // Fuentes
     private static final Font FONT_TITLE = new Font("Courier New", Font.BOLD, 18);
@@ -68,6 +70,7 @@ public class AdminPlayerPanel extends JPanel {
         
         add(createHeaderPanel(), BorderLayout.NORTH);
         add(createContentPanel(), BorderLayout.CENTER);
+        add(createTestPanel(), BorderLayout.SOUTH);
     }
     
     /**
@@ -234,6 +237,64 @@ public class AdminPlayerPanel extends JPanel {
     }
     
     /**
+     * Crea el panel de testing (NUEVO)
+     * Contiene botones para testear funcionalidades sin jugador real
+     * 
+     * @return Panel de testing configurado
+     */
+    private JPanel createTestPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(BG_SECONDARY);
+        panel.setBorder(new EmptyBorder(15, 32, 15, 32));
+        
+        JLabel testLabel = new JLabel("PANEL DE TESTING");
+        testLabel.setFont(FONT_LABEL);
+        testLabel.setForeground(COLOR_DANGER);
+        
+        JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
+        buttonsPanel.setBackground(BG_SECONDARY);
+        buttonsPanel.setOpaque(false);
+        
+        // Botón TEST GAME OVER
+        JButton testGameOverButton = createButton(
+            "[ 💀 TEST GAME OVER ]", 
+            COLOR_DANGER,
+            e -> testGameOver()
+        );
+        
+        buttonsPanel.add(testGameOverButton);
+        
+        panel.add(testLabel, BorderLayout.WEST);
+        panel.add(buttonsPanel, BorderLayout.EAST);
+        
+        return panel;
+    }
+    
+    /**
+     * Simula la muerte de un jugador (para testing)
+     * Envía mensaje GAME_OVER al cliente
+     */
+    private void testGameOver() {
+        int result = JOptionPane.showConfirmDialog(
+            this,
+            "¿Estás seguro de que querés matar al jugador #" + playerId + "?",
+            "CONFIRMAR TEST GAME OVER",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        );
+        
+        if (result == JOptionPane.YES_OPTION) {
+            GameWorld.getInstance().playerDied(playerId);
+            JOptionPane.showMessageDialog(
+                this,
+                "¡GAME OVER enviado al jugador #" + playerId + "!",
+                "TEST COMPLETADO",
+                JOptionPane.INFORMATION_MESSAGE
+            );
+        }
+    }
+    
+    /**
      * Crea un botón con estilo personalizado
      * 
      * @param text Texto del botón
@@ -379,59 +440,66 @@ public class AdminPlayerPanel extends JPanel {
      * @param heightY Altura Y
      */
     private void addFruit(String type, int heightX, int heightY) {
-    int points = 0;
-    switch (type.toUpperCase()) {
-        case "MANGO": points = 50; break;
-        case "BANANO": points = 30; break;
-        case "MANZANA": points = 20; break;
-        default: points = 10; break;
+        int points = 0;
+        switch (type.toUpperCase()) {
+            case "MANGO": points = 50; break;
+            case "BANANO": points = 30; break;
+            case "MANZANA": points = 20; break;
+            default: points = 10; break;
+        }
+
+        // Crear en el GameWorld (esto enviará SPAWN_FRUIT a todos los clientes)
+        Fruit f = GameWorld.getInstance().spawnFruit(type, heightX, heightY, points);
+
+        // Añadir entrada en la lista local del administrador para visual
+        String fruitEntry = type + " (ID:" + f.getId() + " X:" + heightX + " Y:" + heightY + " P:" + points + ")";
+        fruitsModel.addElement(fruitEntry);
     }
-
-    // Crear en el GameWorld (esto enviará SPAWN_FRUIT a todos los clientes)
-    Fruit f = com.doncey.server.GameWorld.getInstance().spawnFruit(type, heightX, heightY, points);
-
-    // Añadir entrada en la lista local del administrador para visual
-    String fruitEntry = type + " (ID:" + f.getId() + " X:" + heightX + " Y:" + heightY + " P:" + points + ")";
-    fruitsModel.addElement(fruitEntry);
-}
     
-    // Elimina la fruta seleccionada de la lista
+    /**
+     * Elimina la fruta seleccionada de la lista
+     */
     private void deleteFruit() {
-    int selectedIndex = fruitsList.getSelectedIndex();
-    if (selectedIndex != -1) {
-        String entry = fruitsModel.getElementAt(selectedIndex);
-        // Suponemos formato con "ID:<id>"
-        int id = -1;
-        int idx = entry.indexOf("ID:");
-        if (idx != -1) {
-            try {
-                int end = entry.indexOf(' ', idx);
-                if (end == -1) end = entry.length();
-                String idStr = entry.substring(idx + 3, end).replaceAll("[^0-9]", "");
-                id = Integer.parseInt(idStr);
-            } catch (Exception ignored) {}
-        }
-        if (id != -1) {
-            boolean removed = com.doncey.server.GameWorld.getInstance().removeFruit(id);
-            // Si no existía en GameWorld, igual borramos visualmente
-        }
-        fruitsModel.remove(selectedIndex);
-        deleteFruitButton.setEnabled(false);
-    }
-}
-
-    public void removeFruitById(int fruitId) {
-    SwingUtilities.invokeLater(() -> {
-        for (int i = 0; i < fruitsModel.size(); i++) {
-            String entry = fruitsModel.getElementAt(i);
-            if (entry.contains("ID:" + fruitId)) {
-                fruitsModel.remove(i);
-                deleteFruitButton.setEnabled(false);
-                break;
+        int selectedIndex = fruitsList.getSelectedIndex();
+        if (selectedIndex != -1) {
+            String entry = fruitsModel.getElementAt(selectedIndex);
+            // Suponemos formato con "ID:<id>"
+            int id = -1;
+            int idx = entry.indexOf("ID:");
+            if (idx != -1) {
+                try {
+                    int end = entry.indexOf(' ', idx);
+                    if (end == -1) end = entry.length();
+                    String idStr = entry.substring(idx + 3, end).replaceAll("[^0-9]", "");
+                    id = Integer.parseInt(idStr);
+                } catch (Exception ignored) {}
             }
+            if (id != -1) {
+                boolean removed = GameWorld.getInstance().removeFruit(id);
+                // Si no existía en GameWorld, igual borramos visualmente
+            }
+            fruitsModel.remove(selectedIndex);
+            deleteFruitButton.setEnabled(false);
         }
-    });
-}
+    }
+
+    /**
+     * Remueve una fruta de la lista de GUI (llamado desde observador)
+     * 
+     * @param fruitId ID de la fruta a remover
+     */
+    public void removeFruitById(int fruitId) {
+        SwingUtilities.invokeLater(() -> {
+            for (int i = 0; i < fruitsModel.size(); i++) {
+                String entry = fruitsModel.getElementAt(i);
+                if (entry.contains("ID:" + fruitId)) {
+                    fruitsModel.remove(i);
+                    deleteFruitButton.setEnabled(false);
+                    break;
+                }
+            }
+        });
+    }
 
     /**
      * Agrega un cocodrilo a la lista

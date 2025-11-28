@@ -4,11 +4,15 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.doncey.patterns.observer.GameEventPublisher;
+
 /**
  * GameWorld mantiene el estado de frutas (spawn/remove) y permite
  * notificar a los clientes conectados sobre estas acciones.
  * 
- * También mantiene el estado de los jugadores conectados
+ * También mantiene el estado de los jugadores conectados.
+ * 
+ * Implementa el patrón Observer para notificar eventos importantes.
  */
 public class GameWorld {
     private static GameWorld instance = null;
@@ -17,7 +21,9 @@ public class GameWorld {
     private final Map<Integer, Fruit> fruits = new ConcurrentHashMap<>();
     private final Map<Integer, Player> players = new ConcurrentHashMap<>();
     private final Set<ClientHandler> clients = Collections.synchronizedSet(new HashSet<>());
-    private final List<Platform> platforms = new ArrayList<>();
+    
+    // Publisher del patrón Observer
+    private final GameEventPublisher eventPublisher = GameEventPublisher.getInstance();
 
     // ======== PLATAFORMAS ========
 
@@ -54,12 +60,11 @@ public class GameWorld {
         int id = fruitIdCounter.incrementAndGet();
         Fruit f = new Fruit(id, x, y, type, points);
         fruits.put(id, f);
-
-        broadcast(String.format(
-            "SPAWN_FRUIT %d %d %d %s %d",
-            id, x, y, type, points
-        ));
-
+        broadcast(String.format("SPAWN_FRUIT %d %d %d %s %d", id, x, y, type, points));
+        
+        // Notificar observadores del patrón Observer
+        eventPublisher.notifyFruitSpawned(id, type, x, y, points);
+        
         System.out.println("[GAMEWORLD] Fruta creada: " + f);
         return f;
     }
@@ -67,7 +72,11 @@ public class GameWorld {
     public boolean removeFruit(int id) {
         Fruit removed = fruits.remove(id);
         if (removed != null) {
-            broadcast("REMOVE_FRUIT " + id);
+            broadcast(String.format("REMOVE_FRUIT %d", id));
+            
+            // Notificar observadores del patrón Observer
+            eventPublisher.notifyFruitRemoved(id);
+            
             System.out.println("[GAMEWORLD] Fruta removida: " + removed);
             return true;
         }
@@ -90,12 +99,20 @@ public class GameWorld {
 
         Player player = new Player(playerId, startX, startY);
         players.put(playerId, player);
+        
+        // Notificar observadores del patrón Observer
+        eventPublisher.notifyPlayerConnected(playerId);
+        
 
         System.out.println("[GAMEWORLD] Jugador registrado: " + player);
     }
 
     public void unregisterPlayer(int playerId) {
         players.remove(playerId);
+        
+        // Notificar observadores del patrón Observer
+        eventPublisher.notifyPlayerDisconnected(playerId);
+        
         System.out.println("[GAMEWORLD] Jugador removido: " + playerId);
     }
 
@@ -137,6 +154,23 @@ public class GameWorld {
             player.update(platforms);
 
             broadcast(player.getPositionMessage());
+        }
+    }
+
+    /**
+     * Notifica que un jugador murió
+     * Envía mensaje GAME_OVER a todos los clientes
+     * 
+     * @param playerId ID del jugador que murió
+     */
+    public void playerDied(int playerId) {
+        Player player = getPlayer(playerId);
+        if (player != null) {
+            System.out.println("[GAMEWORLD] Jugador #" + playerId + " murió");
+            broadcast("GAME_OVER " + playerId);
+            
+            // Notificar observadores del patrón Observer
+            eventPublisher.notifyPlayerDisconnected(playerId);
         }
     }
 

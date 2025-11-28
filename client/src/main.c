@@ -18,6 +18,7 @@
 #include "main_screen.h"
 #include "player_screen.h"
 #include "spectator_screen.h"
+#include "game_over_screen.h"
 #include "client_protocol.h"
 #include "input_handler.h"
 
@@ -33,10 +34,15 @@
 static ServerFruit fruits[MAX_FRUITS];
 static CRITICAL_SECTION fruits_lock;
 static PlayerScreen* player_screen = NULL;
+static GameOverScreen* game_over_screen = NULL;
 static int player_id = -1;
 static SOCKET global_sock = -1;
 static volatile int receiver_running = 0;
-static int player_score = 0;   // ✅ Score global visible para player y spectator
+static int player_score = 0;
+
+// Variables para estado del juego
+static int game_over = 0;
+static int game_over_player_id = -1;
 
 /**
  * @brief Inicializa el array de frutas
@@ -121,6 +127,7 @@ void remove_fruit_from_server(int id) {
  * - SPAWN_FRUIT: crea nueva fruta
  * - REMOVE_FRUIT: elimina fruta
  * - PLAYER_SCORE: notifica que un jugador ganó puntos
+ * - GAME_OVER: notifica que un jugador murió
  * 
  * @param msg Mensaje recibido del servidor (string terminado en \n)
  */
@@ -168,6 +175,19 @@ void handle_server_message(const char* msg) {
         int pid, pts;
         if (sscanf(msg + 12, "%d %d", &pid, &pts) == 2) {
             printf("[CLIENT] PLAYER_SCORE: jugador %d obtuvo %d pts\n", pid, pts);
+        }
+        return;
+    }
+
+    // NUEVO: Procesar GAME_OVER
+    if (strncmp(msg, "GAME_OVER", 9) == 0) {
+        int pid;
+        if (sscanf(msg + 9, "%d", &pid) == 1) {
+            if (pid == player_id) {
+                game_over = 1;
+                game_over_player_id = pid;
+                printf("[CLIENT] ¡GAME OVER! Jugador #%d murió\n", pid);
+            }
         }
         return;
     }
@@ -305,6 +325,7 @@ int main(void) {
     StateManager* state_manager = StateManager_Create();
     MainScreen* main_screen = MainScreen_Create();
     player_screen = PlayerScreen_Create();
+    game_over_screen = GameOverScreen_Create();
     SpectatorScreen* spectator_screen = SpectatorScreen_Create();
 
     printf("[INICIALIZACION]: Todos los recursos gráficos creados\n\n");
@@ -315,6 +336,12 @@ int main(void) {
     while (!WindowShouldClose()) {
 
         GameState current_state = StateManager_GetCurrentState(state_manager);
+
+        // NUEVO: Detectar si hubo game over
+        if (game_over == 1 && current_state == STATE_PLAYER) {
+            StateManager_SetNextState(state_manager, STATE_GAME_OVER);
+            game_over = 0;
+        }
 
         // Detección de click para comer frutas (solo en STATE_PLAYER)
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && current_state == STATE_PLAYER) {
@@ -336,7 +363,7 @@ int main(void) {
                     int pts = fruits[i].points;
 
                     fruits[i].active = 0;
-                    player_score += pts;  // Suma puntos localmente
+                    player_score += pts;
 
                     LeaveCriticalSection(&fruits_lock);
 
@@ -363,6 +390,9 @@ int main(void) {
             case STATE_SPECTATOR:
                 SpectatorScreen_HandleInput(spectator_screen, state_manager);
                 break;
+            case STATE_GAME_OVER:
+                GameOverScreen_HandleInput(game_over_screen, state_manager);
+                break;
             case STATE_EXIT:
                 break;
         }
@@ -381,6 +411,9 @@ int main(void) {
                 case STATE_SPECTATOR:
                     printf("[ESTADO]: Cambio a SPECTATOR\n");
                     break;
+                case STATE_GAME_OVER:
+                    printf("[ESTADO]: Cambio a GAME_OVER\n");
+                    break;
                 case STATE_EXIT:
                     break;
             }
@@ -396,6 +429,9 @@ int main(void) {
                 break;
             case STATE_SPECTATOR:
                 SpectatorScreen_Update(spectator_screen);
+                break;
+            case STATE_GAME_OVER:
+                GameOverScreen_Update(game_over_screen);
                 break;
             default:
                 break;
@@ -421,6 +457,10 @@ int main(void) {
                 draw_score();
                 break;
 
+            case STATE_GAME_OVER:
+                GameOverScreen_Render(game_over_screen);
+                break;
+
             default:
                 break;
         }
@@ -440,6 +480,7 @@ int main(void) {
         close_connection(global_sock);
     }
 
+    GameOverScreen_Destroy(game_over_screen);
     SpectatorScreen_Destroy(spectator_screen);
     PlayerScreen_Destroy(player_screen);
     MainScreen_Destroy(main_screen);

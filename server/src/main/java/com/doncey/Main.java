@@ -3,6 +3,8 @@ package com.doncey;
 import javax.swing.SwingUtilities;
 import com.doncey.admin.ServerGUI;
 import com.doncey.server.GameServer;
+import com.doncey.patterns.observer.GameEventPublisher;
+import com.doncey.patterns.observer.GUIEventObserver;
 
 // Clase principal que inicia el servidor de juego
 public class Main {
@@ -13,6 +15,7 @@ public class Main {
             ServerGUI serverGUI = new ServerGUI();
             serverGUIRef[0] = serverGUI;
             serverGUI.setVisible(true);
+            GameEventPublisher.getInstance().subscribe(new GUIEventObserver(serverGUI));
         });
         
         // Esperar a que la GUI se cree
