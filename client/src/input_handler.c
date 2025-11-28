@@ -18,22 +18,34 @@ void InputHandler_Update(SOCKET sock, int player_id) {
     if (sock == -1 || player_id == -1) return;
     
     int key_state = 0;
+
+
+    // MOVIMIENTO HORIZONTAL
     if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
         key_state = 1;
-    } else if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
+    } 
+    else if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
         key_state = 2;
-    } else {
+    } 
+    else {
         key_state = 0;
     }
     
     if (key_state != last_key_state) {
         if (key_state == 1) {
             send_message(sock, "MOVE_LEFT");
-        } else if (key_state == 2) {
+        } 
+        else if (key_state == 2) {
             send_message(sock, "MOVE_RIGHT");
-        } else {
+        } 
+        else {
             send_message(sock, "STOP_MOVING");
         }
         last_key_state = key_state;
+    }
+
+    // SALTO 
+    if (IsKeyPressed(KEY_SPACE)) {
+        send_message(sock, "JUMP");
     }
 }

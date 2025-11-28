@@ -99,7 +99,7 @@ public class ClientHandler implements Runnable {
     private String processMessage(String message) {
         // Mensajes de movimiento: MOVE_LEFT, MOVE_RIGHT, STOP_MOVING
         try {
-            if (message.startsWith("MOVE_LEFT") || message.startsWith("MOVE_RIGHT") || message.startsWith("STOP_MOVING")) {
+            if (message.startsWith("MOVE_LEFT") || message.startsWith("MOVE_RIGHT") || message.startsWith("STOP_MOVING") || message.startsWith("JUMP")) {
                 GameWorld.getInstance().processPlayerCommand(clientId, message);
                 return null; // No responder, el servidor broadcast la posición
             }

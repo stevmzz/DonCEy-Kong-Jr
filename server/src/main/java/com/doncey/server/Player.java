@@ -1,77 +1,118 @@
 package com.doncey.server;
 
-/**
- * Donkey Kong Jr - Jugador
- * Maneja el estado y lógica del jugador
- */
+import java.util.List;
+
 public class Player {
+
     private final int id;
     private int x;
     private int y;
-    
-    // Control de movimiento
+    private int prevY;   
+
     private boolean movingLeft = false;
     private boolean movingRight = false;
-    
-    // Velocidad de caminata
+
+    private float velocityY = 0;
+    private boolean onGround = false;
+
+    private static final float GRAVITY = 1.2f;
+    private static final float JUMP_FORCE = -20.0f;
     private static final int WALK_SPEED = 5;
-    
-    // Dimensiones del jugador
+
     private static final int WIDTH = 32;
     private static final int HEIGHT = 48;
-    
-    // Límites de la pantalla
+
     private static final int MIN_X = 0;
     private static final int MAX_X = 1024 - WIDTH;
-    
+    private static final int FLOOR_Y = 768 - HEIGHT;
+
     public Player(int id, int startX, int startY) {
         this.id = id;
         this.x = startX;
         this.y = startY;
+        this.prevY = startY;
+        this.velocityY = 0;
+        this.onGround = false;
     }
-    
-    // Control del jugador - movimiento
-    public void moveLeft() {
-        movingLeft = true;
-    }
-    
-    public void moveRight() {
-        movingRight = true;
-    }
-    
+
+    // ==========================
+    // CONTROLES
+    // ==========================
+
+    public void moveLeft() { movingLeft = true; }
+    public void moveRight() { movingRight = true; }
+
     public void stopMoving() {
         movingLeft = false;
         movingRight = false;
     }
-    
-    // Actualización del jugador cada frame
-    public void update() {
-        if (movingLeft) {
-            x -= WALK_SPEED;
+
+    public void jump() {
+        if (onGround) {
+            velocityY = JUMP_FORCE;
+            onGround = false;
+            System.out.println("[PLAYER] SALTO");
         }
-        if (movingRight) {
-            x += WALK_SPEED;
+    }
+
+    // ==========================
+    // UPDATE (FÍSICAS)
+    // ==========================
+
+    public void update(List<Platform> platforms) {
+
+        // Guardar la posición previa ANTES de mover
+        prevY = y;
+
+        // Movimiento horizontal
+        if (movingLeft) x -= WALK_SPEED;
+        if (movingRight) x += WALK_SPEED;
+
+        // Gravedad
+        velocityY += GRAVITY;
+        y += velocityY;
+
+        // Aún no está en suelo
+        onGround = false;
+
+        // ----------- COLISIÓN CON PLATAFORMAS -----------
+        for (Platform p : platforms) {
+
+            if (velocityY >= 0 && p.collides(this)) {
+
+                // Aterriza encima de la plataforma
+                y = p.getY() - HEIGHT;
+
+                velocityY = 0;
+                onGround = true;
+                break;
+            }
         }
-        
-        // Limitar posición a pantalla
+
+        // ----------- COLISIÓN CON EL SUELO -----------
+        if (y >= FLOOR_Y) {
+            y = FLOOR_Y;
+            velocityY = 0;
+            onGround = true;
+        }
+
+        // ----------- LÍMITES DE PANTALLA -----------
         if (x < MIN_X) x = MIN_X;
         if (x > MAX_X) x = MAX_X;
     }
-    
-    // Getters
+
+    // ==========================
+    // GETTERS
+    // ==========================
+
     public int getId() { return id; }
     public int getX() { return x; }
     public int getY() { return y; }
+    public int getPrevY() { return prevY; } // ← GETTER NUEVO
     public int getWidth() { return WIDTH; }
     public int getHeight() { return HEIGHT; }
-    
-    // Mensaje para enviar al cliente
+
     public String getPositionMessage() {
         return String.format("PLAYER_POS %d %d %d", id, x, y);
-    }
-    
-    @Override
-    public String toString() {
-        return "Player{" + id + ", pos=(" + x + "," + y + ")}";
     }
 }
