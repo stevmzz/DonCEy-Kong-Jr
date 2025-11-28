@@ -161,8 +161,6 @@ public class ClientHandler implements Runnable {
             running = false;
             // quitar del GameWorld
             GameWorld.getInstance().unregisterPlayer(clientId);
-
-            GameWorld.getInstance().unregisterPlayer(clientId);
             GameWorld.getInstance().unregisterClient(this);
             if (serverGUI != null) serverGUI.notifyPlayerDisconnected(clientId);
             if (in != null) try { in.close(); } catch (IOException ignored) {}

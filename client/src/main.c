@@ -19,32 +19,53 @@
 #include "player_screen.h"
 #include "spectator_screen.h"
 #include "client_protocol.h"
+#include "input_handler.h"
 
 #define MAX_MSG_LEN 1024
 
-// ==============================
-// STORAGE GLOBAL DE FRUTAS
-// ==============================
+/**
+ * @brief Storage global de frutas
+ * 
+ * Array que almacena todas las frutas activas recibidas del servidor.
+ * Protegido con mutex (fruits_lock) para acceso thread-safe desde
+ * el hilo receptor y el hilo principal de rendering.
+ */
 static ServerFruit fruits[MAX_FRUITS];
 static CRITICAL_SECTION fruits_lock;
+static PlayerScreen* player_screen = NULL;
 static int player_id = -1;
 static SOCKET global_sock = -1;
 static volatile int receiver_running = 0;
-static int player_score = 0;   // ✅ SCORE GLOBAL VISIBLE PARA PLAYER Y SPECTATOR
+static int player_score = 0;   // ✅ Score global visible para player y spectator
 
-// ==============================
-// INICIALIZACIÓN DE FRUTAS
-// ==============================
+/**
+ * @brief Inicializa el array de frutas
+ * 
+ * Marca todas las frutas como inactivas al inicio del programa.
+ */
 void init_fruits() {
-    for (int i = 0; i < MAX_FRUITS; ++i) fruits[i].active = 0;
+    for (int i = 0; i < MAX_FRUITS; ++i) {
+        fruits[i].active = 0;
+    }
 }
 
-// ==============================
-// AGREGAR / REEMPLAZAR FRUTA
-// ==============================
+/**
+ * @brief Agrega o reemplaza una fruta en el storage global
+ * 
+ * Si ya existe una fruta con ese ID, actualiza su posición y puntos.
+ * Si no existe, la agrega en el primer slot disponible.
+ * Thread-safe: usa mutex para proteger acceso concurrente.
+ * 
+ * @param id ID único de la fruta (asignado por servidor)
+ * @param x Posición X en pantalla
+ * @param y Posición Y en pantalla
+ * @param type Tipo de fruta ("MANZANA", "BANANO", "MANGO")
+ * @param points Puntos que vale esta fruta
+ */
 void add_or_replace_fruit_from_server(int id, int x, int y, const char* type, int points) {
     EnterCriticalSection(&fruits_lock);
 
+    // Buscar si ya existe y actualizar
     for (int i = 0; i < MAX_FRUITS; ++i) {
         if (fruits[i].active && fruits[i].id == id) {
             fruits[i].x = x;
@@ -56,6 +77,7 @@ void add_or_replace_fruit_from_server(int id, int x, int y, const char* type, in
         }
     }
 
+    // Buscar primer slot vacío
     for (int i = 0; i < MAX_FRUITS; ++i) {
         if (!fruits[i].active) {
             fruits[i].active = 1;
@@ -72,9 +94,11 @@ void add_or_replace_fruit_from_server(int id, int x, int y, const char* type, in
     LeaveCriticalSection(&fruits_lock);
 }
 
-// ==============================
-// REMOVER FRUTA
-// ==============================
+/**
+ * @brief Remueve una fruta del storage global
+ * 
+ * @param id ID único de la fruta a remover
+ */
 void remove_fruit_from_server(int id) {
     EnterCriticalSection(&fruits_lock);
 
@@ -88,16 +112,35 @@ void remove_fruit_from_server(int id) {
     LeaveCriticalSection(&fruits_lock);
 }
 
-// ==============================
-// MANEJO DE MENSAJES DEL SERVIDOR
-// ==============================
+/**
+ * @brief Procesa mensajes recibidos del servidor
+ * 
+ * Parsea y maneja los siguientes tipos de mensajes:
+ * - ASSIGN_ID: asigna ID único al cliente
+ * - PLAYER_POS: actualiza posición de un jugador en pantalla
+ * - SPAWN_FRUIT: crea nueva fruta
+ * - REMOVE_FRUIT: elimina fruta
+ * - PLAYER_SCORE: notifica que un jugador ganó puntos
+ * 
+ * @param msg Mensaje recibido del servidor (string terminado en \n)
+ */
 void handle_server_message(const char* msg) {
 
     if (strncmp(msg, "ASSIGN_ID", 9) == 0) {
         int id = -1;
         if (sscanf(msg + 9, "%d", &id) == 1) {
             player_id = id;
-            printf("[CLIENT] Assigned id %d\n", player_id);
+            printf("[CLIENT] Asignado ID: %d\n", player_id);
+        }
+        return;
+    }
+
+    if (strncmp(msg, "PLAYER_POS", 10) == 0) {
+        int id, x, y;
+        if (sscanf(msg + 10, "%d %d %d", &id, &x, &y) == 3) {
+            if (player_screen != NULL) {
+                PlayerScreen_UpdatePlayerPos(player_screen, id, x, y);
+            }
         }
         return;
     }
@@ -107,7 +150,7 @@ void handle_server_message(const char* msg) {
         char type[64];
         if (sscanf(msg + 11, "%d %d %d %63s %d", &fid, &x, &y, type, &pts) >= 4) {
             add_or_replace_fruit_from_server(fid, x, y, type, pts);
-            printf("[CLIENT] SPAWN_FRUIT %d (%s) at %d,%d (%d pts)\n", fid, type, x, y, pts);
+            printf("[CLIENT] SPAWN_FRUIT %d (%s) en (%d,%d) = %d pts\n", fid, type, x, y, pts);
         }
         return;
     }
@@ -124,15 +167,22 @@ void handle_server_message(const char* msg) {
     if (strncmp(msg, "PLAYER_SCORE", 12) == 0) {
         int pid, pts;
         if (sscanf(msg + 12, "%d %d", &pid, &pts) == 2) {
-            printf("[CLIENT] PLAYER_SCORE player %d got %d pts\n", pid, pts);
+            printf("[CLIENT] PLAYER_SCORE: jugador %d obtuvo %d pts\n", pid, pts);
         }
         return;
     }
 }
 
-// ==============================
-// HILO RECEPTOR
-// ==============================
+/**
+ * @brief Hilo receptor de mensajes del servidor
+ * 
+ * Se ejecuta en paralelo con el hilo principal.
+ * Lee continuamente mensajes del servidor y los procesa.
+ * Termina cuando receiver_running se pone en 0.
+ * 
+ * @param param Socket de conexión (SOCKET)
+ * @return 0 al terminar
+ */
 DWORD WINAPI receiver_thread_func(LPVOID param) {
     SOCKET sock = (SOCKET)param;
     char *msg;
@@ -141,7 +191,7 @@ DWORD WINAPI receiver_thread_func(LPVOID param) {
     while (receiver_running) {
         msg = recv_message(sock);
         if (msg == NULL) {
-            printf("[CLIENT] recv returned NULL, stopping receiver\n");
+            printf("[CLIENT] Receptor: conexión cerrada\n");
             break;
         }
         handle_server_message(msg);
@@ -151,9 +201,12 @@ DWORD WINAPI receiver_thread_func(LPVOID param) {
     return 0;
 }
 
-// ==============================
-// ENVÍO DE COMER FRUTA
-// ==============================
+/**
+ * @brief Envía comando de comer fruta al servidor
+ * 
+ * @param sock Socket de conexión
+ * @param fid ID de la fruta a comer
+ */
 void send_eat_fruit(SOCKET sock, int fid) {
     if (sock == -1 || player_id == -1) return;
 
@@ -162,9 +215,17 @@ void send_eat_fruit(SOCKET sock, int fid) {
     send_message(sock, buf);
 }
 
-// ==============================
-// DIBUJAR FRUTAS CON FORMAS Y COLORES
-// ==============================
+/**
+ * @brief Renderiza todas las frutas activas en pantalla
+ * 
+ * Cada tipo de fruta tiene una representación visual diferente:
+ * - MANZANA: círculo rojo
+ * - BANANO: rectángulo amarillo
+ * - MANGO: hexágono rosa
+ * 
+ * Dibuja el nombre y los puntos debajo de cada fruta.
+ * Thread-safe: usa mutex para proteger lectura de array.
+ */
 void draw_fruits() {
     EnterCriticalSection(&fruits_lock);
 
@@ -174,31 +235,20 @@ void draw_fruits() {
         int x = fruits[i].x;
         int y = fruits[i].y;
 
-        // =========================
-        // MANZANA → CÍRCULO ROJO
-        // =========================
+        // MANZANA → Círculo rojo
         if (strcmp(fruits[i].type, "MANZANA") == 0) {
             DrawCircle(x, y, 14, RED);
         }
-
-        // =========================
-        // BANANO → RECTÁNGULO AMARILLO (MÁS LARGO)
-        // =========================
+        // BANANO → Rectángulo amarillo (alargado)
         else if (strcmp(fruits[i].type, "BANANO") == 0) {
-            DrawRectangle(x - 25, y - 8, 50, 16, YELLOW); // ✅ más largo
+            DrawRectangle(x - 25, y - 8, 50, 16, YELLOW);
         }
-
-        // =========================
-        // MANGO → HEXÁGONO ROSADO (FORMA CORRECTA)
-        // =========================
+        // MANGO → Hexágono rosa
         else if (strcmp(fruits[i].type, "MANGO") == 0) {
-            // ✅ DrawPoly asegura que siempre se vea
             DrawPoly((Vector2){x, y}, 6, 16.0f, 0.0f, PINK);
         }
 
-        // =========================
-        // TEXTO Y PUNTOS
-        // =========================
+        // Etiqueta y puntos
         DrawText(fruits[i].type, x - 28, y - 32, 10, BLACK);
 
         char pts[16];
@@ -209,18 +259,24 @@ void draw_fruits() {
     LeaveCriticalSection(&fruits_lock);
 }
 
-// ==============================
-// DIBUJAR SCORE (PLAYER Y SPECTATOR)
-// ==============================
+/**
+ * @brief Renderiza el score en la esquina superior derecha
+ * 
+ * Visible tanto en STATE_PLAYER como en STATE_SPECTATOR.
+ */
 void draw_score() {
     char score_text[64];
     snprintf(score_text, sizeof(score_text), "PUNTOS: %d", player_score);
     DrawText(score_text, 820, 20, 24, BLACK);
 }
 
-// ==============================
-// MAIN
-// ==============================
+/**
+ * @brief Función principal
+ * 
+ * Inicializa conexión con servidor (si está disponible),
+ * crea ventana Raylib, maneja game loop principal,
+ * y limpia recursos al salir.
+ */
 int main(void) {
 
     SOCKET sock;
@@ -244,19 +300,24 @@ int main(void) {
 
     InitWindow(1024, 768, "DonCEy Kong Jr");
     SetTargetFPS(60);
+    printf("[RAYLIB]: Ventana creada (1024x768)\n");
 
     StateManager* state_manager = StateManager_Create();
     MainScreen* main_screen = MainScreen_Create();
-    PlayerScreen* player_screen = PlayerScreen_Create();
+    player_screen = PlayerScreen_Create();
     SpectatorScreen* spectator_screen = SpectatorScreen_Create();
 
+    printf("[INICIALIZACION]: Todos los recursos gráficos creados\n\n");
+
+    // ============================================
+    // GAME LOOP PRINCIPAL
+    // ============================================
     while (!WindowShouldClose()) {
 
         GameState current_state = StateManager_GetCurrentState(state_manager);
 
-        // DETECCIÓN DE CLICK PARA COMER
+        // Detección de click para comer frutas (solo en STATE_PLAYER)
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && current_state == STATE_PLAYER) {
-
             int mx = GetMouseX();
             int my = GetMouseY();
 
@@ -269,18 +330,19 @@ int main(void) {
                 int dy = my - fruits[i].y;
                 int dist2 = dx * dx + dy * dy;
 
+                // Si clickeó cerca de la fruta (radio ~20px)
                 if (dist2 <= (20 * 20)) {
-
                     int fid = fruits[i].id;
                     int pts = fruits[i].points;
 
                     fruits[i].active = 0;
-                    player_score += pts;  // ✅ SUMA DE PUNTOS
+                    player_score += pts;  // Suma puntos localmente
 
                     LeaveCriticalSection(&fruits_lock);
 
-                    if (global_sock != -1)
+                    if (global_sock != -1) {
                         send_eat_fruit(global_sock, fid);
+                    }
 
                     break;
                 }
@@ -289,32 +351,57 @@ int main(void) {
             LeaveCriticalSection(&fruits_lock);
         }
 
-        // ==============================
-        // INPUT
-        // ==============================
+        // INPUT HANDLING
         switch (current_state) {
-            case STATE_MAIN_MENU:   MainScreen_HandleInput(main_screen, state_manager); break;
-            case STATE_PLAYER:      PlayerScreen_HandleInput(player_screen, state_manager); break;
-            case STATE_SPECTATOR:   SpectatorScreen_HandleInput(spectator_screen, state_manager); break;
-            default: break;
+            case STATE_MAIN_MENU:
+                MainScreen_HandleInput(main_screen, state_manager);
+                break;
+            case STATE_PLAYER:
+                InputHandler_Update(global_sock, player_id);
+                PlayerScreen_HandleInput(player_screen, state_manager);
+                break;
+            case STATE_SPECTATOR:
+                SpectatorScreen_HandleInput(spectator_screen, state_manager);
+                break;
+            case STATE_EXIT:
+                break;
         }
 
         StateManager_Update(state_manager);
         current_state = StateManager_GetCurrentState(state_manager);
 
-        // ==============================
-        // UPDATE
-        // ==============================
-        switch (current_state) {
-            case STATE_MAIN_MENU:   MainScreen_Update(main_screen); break;
-            case STATE_PLAYER:      PlayerScreen_Update(player_screen); break;
-            case STATE_SPECTATOR:   SpectatorScreen_Update(spectator_screen); break;
-            default: break;
+        if (StateManager_HasStateChanged(state_manager)) {
+            switch (current_state) {
+                case STATE_MAIN_MENU:
+                    printf("[ESTADO]: Cambio a MAIN_MENU\n");
+                    break;
+                case STATE_PLAYER:
+                    printf("[ESTADO]: Cambio a PLAYER\n");
+                    break;
+                case STATE_SPECTATOR:
+                    printf("[ESTADO]: Cambio a SPECTATOR\n");
+                    break;
+                case STATE_EXIT:
+                    break;
+            }
         }
 
-        // ==============================
+        // UPDATE LOGIC
+        switch (current_state) {
+            case STATE_MAIN_MENU:
+                MainScreen_Update(main_screen);
+                break;
+            case STATE_PLAYER:
+                PlayerScreen_Update(player_screen);
+                break;
+            case STATE_SPECTATOR:
+                SpectatorScreen_Update(spectator_screen);
+                break;
+            default:
+                break;
+        }
+
         // RENDER
-        // ==============================
         BeginDrawing();
 
         switch (current_state) {
@@ -325,25 +412,33 @@ int main(void) {
             case STATE_PLAYER:
                 PlayerScreen_Render(player_screen);
                 draw_fruits();
-                draw_score();   
+                draw_score();
                 break;
 
             case STATE_SPECTATOR:
                 SpectatorScreen_Render(spectator_screen);
                 draw_fruits();
-                draw_score();   
+                draw_score();
                 break;
 
-            default: break;
+            default:
+                break;
         }
 
         EndDrawing();
+
+        if (current_state == STATE_EXIT) {
+            break;
+        }
     }
 
+    // CLEANUP
     receiver_running = 0;
     Sleep(100);
 
-    if (global_sock != -1) close_connection(global_sock);
+    if (global_sock != -1) {
+        close_connection(global_sock);
+    }
 
     SpectatorScreen_Destroy(spectator_screen);
     PlayerScreen_Destroy(player_screen);
@@ -354,5 +449,6 @@ int main(void) {
     DeleteCriticalSection(&fruits_lock);
 
     printf("\n[SALIDA]: Programa finalizado\n\n");
+
     return 0;
 }
