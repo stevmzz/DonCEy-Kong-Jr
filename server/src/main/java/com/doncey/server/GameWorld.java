@@ -5,12 +5,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.doncey.patterns.observer.GameEventPublisher;
+import com.doncey.patterns.factory.FruitFactory;
+import com.doncey.patterns.factory.GameEntityFactory;
 
 /**
  * GameWorld mantiene el estado de frutas (spawn/remove), plataformas y jugadores.
  * Permite notificar a los clientes conectados sobre estas acciones.
  * 
  * Implementa el patrón Observer para notificar eventos importantes.
+ * Implementa el patrón Factory para crear frutas de forma desacoplada.
  */
 public class GameWorld {
     private static GameWorld instance = null;
@@ -23,6 +26,9 @@ public class GameWorld {
     
     // Publisher del patrón Observer
     private final GameEventPublisher eventPublisher = GameEventPublisher.getInstance();
+    
+    // Factory del patrón Factory para crear frutas
+    private final GameEntityFactory fruitFactory = new FruitFactory();
 
     // ======== CONSTRUCTOR ========
 
@@ -58,15 +64,22 @@ public class GameWorld {
     /**
      * Genera una fruta en una posición especificada
      * 
-     * @param type Tipo de fruta
+     * Utiliza el patrón Factory (FruitFactory) para crear la fruta
+     * de forma desacoplada, permitiendo validación y extensión futura.
+     * 
+     * @param type Tipo de fruta (MANZANA, BANANO, MANGO)
      * @param x Posición X
      * @param y Posición Y
      * @param points Puntos que vale la fruta
      * @return Objeto Fruit creado
+     * @throws IllegalArgumentException si el tipo de fruta es inválido
      */
     public Fruit spawnFruit(String type, int x, int y, int points) {
         int id = fruitIdCounter.incrementAndGet();
-        Fruit f = new Fruit(id, x, y, type, points);
+        
+        // Usar la factory para crear la fruta
+        Fruit f = fruitFactory.createFruit(id, x, y, type, points);
+        
         fruits.put(id, f);
         broadcast(String.format("SPAWN_FRUIT %d %d %d %s %d", id, x, y, type, points));
         
