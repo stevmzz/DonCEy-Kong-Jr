@@ -7,10 +7,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.doncey.patterns.observer.GameEventPublisher;
 
 /**
- * GameWorld mantiene el estado de frutas (spawn/remove) y permite
- * notificar a los clientes conectados sobre estas acciones.
- * 
- * También mantiene el estado de los jugadores conectados.
+ * GameWorld mantiene el estado de frutas (spawn/remove), plataformas y jugadores.
+ * Permite notificar a los clientes conectados sobre estas acciones.
  * 
  * Implementa el patrón Observer para notificar eventos importantes.
  */
@@ -21,14 +19,14 @@ public class GameWorld {
     private final Map<Integer, Fruit> fruits = new ConcurrentHashMap<>();
     private final Map<Integer, Player> players = new ConcurrentHashMap<>();
     private final Set<ClientHandler> clients = Collections.synchronizedSet(new HashSet<>());
+    private final List<Platform> platforms = new ArrayList<>();
     
     // Publisher del patrón Observer
     private final GameEventPublisher eventPublisher = GameEventPublisher.getInstance();
 
-    // ======== PLATAFORMAS ========
+    // ======== CONSTRUCTOR ========
 
     private GameWorld() {
-
         // =======================
         //  PLATAFORMAS DEL NIVEL
         // =======================
@@ -46,6 +44,7 @@ public class GameWorld {
         platforms.add(new Platform(727, 640, 110, 25));
         platforms.add(new Platform(900, 600, 110, 25));
         platforms.add(new Platform(585, 720, 100, 25));
+        
         System.out.println("[GAMEWORLD] Plataformas cargadas: " + platforms.size());
     }
 
@@ -56,6 +55,15 @@ public class GameWorld {
 
     // ======== FRUTAS ========
 
+    /**
+     * Genera una fruta en una posición especificada
+     * 
+     * @param type Tipo de fruta
+     * @param x Posición X
+     * @param y Posición Y
+     * @param points Puntos que vale la fruta
+     * @return Objeto Fruit creado
+     */
     public Fruit spawnFruit(String type, int x, int y, int points) {
         int id = fruitIdCounter.incrementAndGet();
         Fruit f = new Fruit(id, x, y, type, points);
@@ -69,6 +77,12 @@ public class GameWorld {
         return f;
     }
 
+    /**
+     * Elimina una fruta del mundo
+     * 
+     * @param id ID de la fruta
+     * @return true si fue eliminada, false si no existía
+     */
     public boolean removeFruit(int id) {
         Fruit removed = fruits.remove(id);
         if (removed != null) {
@@ -83,16 +97,33 @@ public class GameWorld {
         return false;
     }
 
+    /**
+     * Obtiene una fruta por ID
+     * 
+     * @param id ID de la fruta
+     * @return Objeto Fruit o null si no existe
+     */
     public Fruit getFruit(int id) {
         return fruits.get(id);
     }
 
+    /**
+     * Lista todas las frutas activas
+     * 
+     * @return Colección de frutas
+     */
     public Collection<Fruit> listFruits() {
         return fruits.values();
     }
 
     // ======== JUGADORES ========
 
+    /**
+     * Registra un nuevo jugador en el mundo
+     * 
+     * @param playerId ID del jugador
+     * @param handler ClientHandler asociado
+     */
     public void registerPlayer(int playerId, ClientHandler handler) {
         int startX = 50;
         int startY = 400;   // justo arriba de la plataforma
@@ -103,10 +134,14 @@ public class GameWorld {
         // Notificar observadores del patrón Observer
         eventPublisher.notifyPlayerConnected(playerId);
         
-
         System.out.println("[GAMEWORLD] Jugador registrado: " + player);
     }
 
+    /**
+     * Desregistra un jugador del mundo
+     * 
+     * @param playerId ID del jugador
+     */
     public void unregisterPlayer(int playerId) {
         players.remove(playerId);
         
@@ -116,12 +151,33 @@ public class GameWorld {
         System.out.println("[GAMEWORLD] Jugador removido: " + playerId);
     }
 
+    /**
+     * Obtiene un jugador por ID
+     * 
+     * @param playerId ID del jugador
+     * @return Objeto Player o null si no existe
+     */
     public Player getPlayer(int playerId) {
         return players.get(playerId);
     }
 
+    /**
+     * Lista todos los jugadores activos
+     * 
+     * @return Colección de jugadores
+     */
+    public Collection<Player> listPlayers() {
+        return players.values();
+    }
+
     // ======== COMANDOS ========
 
+    /**
+     * Procesa comandos del cliente
+     * 
+     * @param playerId ID del jugador
+     * @param command Comando a procesar (MOVE_LEFT, MOVE_RIGHT, STOP_MOVING, JUMP)
+     */
     public void processPlayerCommand(int playerId, String command) {
         Player player = getPlayer(playerId);
         if (player == null) return;
@@ -131,28 +187,39 @@ public class GameWorld {
 
         String action = parts[0].toUpperCase();
 
-        if (action.equals("MOVE_LEFT")) {
-            player.moveLeft();
-        }
-        else if (action.equals("MOVE_RIGHT")) {
-            player.moveRight();
-        }
-        else if (action.equals("STOP_MOVING")) {
-            player.stopMoving();
-        }
-        else if (action.equals("JUMP")) {
-            player.jump();
+        switch (action) {
+            case "MOVE_LEFT":
+                player.moveLeft();
+                break;
+            case "MOVE_RIGHT":
+                player.moveRight();
+                break;
+            case "STOP_MOVING":
+                player.stopMoving();
+                break;
+            case "JUMP":
+                player.jump();
+                break;
+            default:
+                System.out.println("[GAMEWORLD] Comando desconocido: " + action);
         }
     }
 
     // ======== GAME LOOP ========
 
+    /**
+     * Actualiza la lógica del juego cada frame
+     * 
+     * Procesa:
+     * - Actualización de posición de jugadores (con colisiones)
+     * - Envío de posiciones a todos los clientes
+     */
     public void updateGameLogic() {
-
         for (Player player : players.values()) {
-
+            // Actualizar posición del jugador pasando las plataformas
             player.update(platforms);
-
+            
+            // Enviar posición actualizada a todos los clientes
             broadcast(player.getPositionMessage());
         }
     }
@@ -176,6 +243,11 @@ public class GameWorld {
 
     // ======== CLIENTES ========
 
+    /**
+     * Registra un cliente para recibir broadcasts
+     * 
+     * @param ch ClientHandler del cliente
+     */
     public void registerClient(ClientHandler ch) {
         clients.add(ch);
 
@@ -192,10 +264,20 @@ public class GameWorld {
         }
     }
 
+    /**
+     * Desregistra un cliente
+     * 
+     * @param ch ClientHandler del cliente
+     */
     public void unregisterClient(ClientHandler ch) {
         clients.remove(ch);
     }
 
+    /**
+     * Envía un mensaje a todos los clientes (broadcast)
+     * 
+     * @param msg Mensaje a enviar
+     */
     public void broadcast(String msg) {
         synchronized (clients) {
             for (ClientHandler ch : clients) {
@@ -204,9 +286,36 @@ public class GameWorld {
         }
     }
 
-    // ======== PLATAFORMAS  ========
+    // ======== PLATAFORMAS ========
 
+    /**
+     * Obtiene la lista de plataformas del nivel
+     * 
+     * @return Lista de plataformas
+     */
     public List<Platform> getPlatforms() {
         return platforms;
+    }
+
+    /**
+     * Obtiene una plataforma por índice
+     * 
+     * @param index Índice de la plataforma
+     * @return Objeto Platform
+     */
+    public Platform getPlatform(int index) {
+        if (index >= 0 && index < platforms.size()) {
+            return platforms.get(index);
+        }
+        return null;
+    }
+
+    /**
+     * Obtiene el total de plataformas
+     * 
+     * @return Cantidad de plataformas
+     */
+    public int getPlatformCount() {
+        return platforms.size();
     }
 }
