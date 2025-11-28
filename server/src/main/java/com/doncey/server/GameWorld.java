@@ -20,13 +20,34 @@ public class GameWorld {
     private final AtomicInteger fruitIdCounter = new AtomicInteger(0);
     private final Map<Integer, Fruit> fruits = new ConcurrentHashMap<>();
     private final Map<Integer, Player> players = new ConcurrentHashMap<>();
-    // Lista de client handlers registrados para broadcast
     private final Set<ClientHandler> clients = Collections.synchronizedSet(new HashSet<>());
     
     // Publisher del patrón Observer
     private final GameEventPublisher eventPublisher = GameEventPublisher.getInstance();
 
-    private GameWorld() { }
+    // ======== PLATAFORMAS ========
+
+    private GameWorld() {
+
+        // =======================
+        //  PLATAFORMAS DEL NIVEL
+        // =======================
+
+        // === CAFÉS (las largas marrón oscuro) ===
+        platforms.add(new Platform(0, 210, 680, 25));
+        platforms.add(new Platform(210, 350, 200, 25));
+        platforms.add(new Platform(640, 240, 200, 25));
+        platforms.add(new Platform(160, 520, 250, 25));
+        platforms.add(new Platform(800, 420, 220, 25));
+
+        // === VERDES (las que tienen césped) ===
+        platforms.add(new Platform(0, 720, 350, 25));
+        platforms.add(new Platform(410, 680, 110, 25));
+        platforms.add(new Platform(727, 640, 110, 25));
+        platforms.add(new Platform(900, 600, 110, 25));
+        platforms.add(new Platform(585, 720, 100, 25));
+        System.out.println("[GAMEWORLD] Plataformas cargadas: " + platforms.size());
+    }
 
     public static synchronized GameWorld getInstance() {
         if (instance == null) instance = new GameWorld();
@@ -34,6 +55,7 @@ public class GameWorld {
     }
 
     // ======== FRUTAS ========
+
     public Fruit spawnFruit(String type, int x, int y, int points) {
         int id = fruitIdCounter.incrementAndGet();
         Fruit f = new Fruit(id, x, y, type, points);
@@ -70,16 +92,21 @@ public class GameWorld {
     }
 
     // ======== JUGADORES ========
+
     public void registerPlayer(int playerId, ClientHandler handler) {
-        Player player = new Player(playerId, 100, 400);
+        int startX = 50;
+        int startY = 400;   // justo arriba de la plataforma
+
+        Player player = new Player(playerId, startX, startY);
         players.put(playerId, player);
         
         // Notificar observadores del patrón Observer
         eventPublisher.notifyPlayerConnected(playerId);
         
+
         System.out.println("[GAMEWORLD] Jugador registrado: " + player);
     }
-    
+
     public void unregisterPlayer(int playerId) {
         players.remove(playerId);
         
@@ -88,34 +115,44 @@ public class GameWorld {
         
         System.out.println("[GAMEWORLD] Jugador removido: " + playerId);
     }
-    
+
     public Player getPlayer(int playerId) {
         return players.get(playerId);
     }
-    
-    // Procesar comandos de movimiento del cliente
+
+    // ======== COMANDOS ========
+
     public void processPlayerCommand(int playerId, String command) {
         Player player = getPlayer(playerId);
         if (player == null) return;
-        
+
         String[] parts = command.split("\\s+");
         if (parts.length == 0) return;
-        
+
         String action = parts[0].toUpperCase();
-        
+
         if (action.equals("MOVE_LEFT")) {
             player.moveLeft();
-        } else if (action.equals("MOVE_RIGHT")) {
+        }
+        else if (action.equals("MOVE_RIGHT")) {
             player.moveRight();
-        } else if (action.equals("STOP_MOVING")) {
+        }
+        else if (action.equals("STOP_MOVING")) {
             player.stopMoving();
         }
+        else if (action.equals("JUMP")) {
+            player.jump();
+        }
     }
-    
-    // Actualizar lógica del juego (cada frame)
+
+    // ======== GAME LOOP ========
+
     public void updateGameLogic() {
+
         for (Player player : players.values()) {
-            player.update();
+
+            player.update(platforms);
+
             broadcast(player.getPositionMessage());
         }
     }
@@ -138,11 +175,20 @@ public class GameWorld {
     }
 
     // ======== CLIENTES ========
+
     public void registerClient(ClientHandler ch) {
         clients.add(ch);
-        // al registrarse, enviar estado actual (spawn de todas las frutas)
+
+        // Enviar todas las frutas actuales al conectarse
         for (Fruit f : listFruits()) {
-            ch.sendMessage(String.format("SPAWN_FRUIT %d %d %d %s %d", f.getId(), f.getX(), f.getY(), f.getType(), f.getPoints()));
+            ch.sendMessage(String.format(
+                "SPAWN_FRUIT %d %d %d %s %d",
+                f.getId(),
+                f.getX(),
+                f.getY(),
+                f.getType(),
+                f.getPoints()
+            ));
         }
     }
 
@@ -156,5 +202,11 @@ public class GameWorld {
                 ch.sendMessage(msg);
             }
         }
+    }
+
+    // ======== PLATAFORMAS  ========
+
+    public List<Platform> getPlatforms() {
+        return platforms;
     }
 }

@@ -21,6 +21,7 @@ add_executable(client
     src/screen/player_screen.c
     src/screen/spectator_screen.c
     src/screen/game_over_screen.c
+    src/platform.c
 )
 
 if(WIN32)

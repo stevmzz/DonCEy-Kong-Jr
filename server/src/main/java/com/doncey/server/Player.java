@@ -1,54 +1,168 @@
 package com.doncey.server;
 
+import java.util.List;
+
 /**
- * Donkey Kong Jr - Jugador
- * Maneja el estado y lógica del jugador
+ * Player - Jugador del juego DonCEy Kong Jr
+ * 
+ * Maneja el estado, física y controles del jugador.
+ * 
+ * Características:
+ * - Movimiento horizontal (izquierda/derecha)
+ * - Salto con gravedad realista
+ * - Colisión con plataformas
+ * - Sistema de vidas (loseLive, isAlive)
  */
 public class Player {
     private final int id;
     private int x;
     private int y;
+    private int prevY;   
     
     // Control de movimiento
     private boolean movingLeft = false;
     private boolean movingRight = false;
     
-    // Velocidad de caminata
+    // Física
+    private float velocityY = 0;
+    private boolean onGround = false;
+    
+    // Constantes de física
+    private static final float GRAVITY = 1.2f;
+    private static final float JUMP_FORCE = -20.0f;
     private static final int WALK_SPEED = 5;
     
-    // Dimensiones del jugador
+    // Dimensiones
     private static final int WIDTH = 32;
     private static final int HEIGHT = 48;
     
-    // Límites de la pantalla
+    // Límites de pantalla
     private static final int MIN_X = 0;
     private static final int MAX_X = 1024 - WIDTH;
+    private static final int FLOOR_Y = 768 - HEIGHT;
     
+    /**
+     * Constructor del Jugador
+     * 
+     * @param id ID único del jugador
+     * @param startX Posición X inicial
+     * @param startY Posición Y inicial
+     */
     public Player(int id, int startX, int startY) {
         this.id = id;
         this.x = startX;
         this.y = startY;
+        this.prevY = startY;
+        this.velocityY = 0;
+        this.onGround = false;
     }
     
-    // Control del jugador - movimiento
-    public void moveLeft() {
-        movingLeft = true;
+    // ==========================
+    // CONTROLES
+    // ==========================
+    
+    /**
+     * Inicia movimiento hacia la izquierda
+     */
+    public void moveLeft() { 
+        movingLeft = true; 
     }
     
-    public void moveRight() {
-        movingRight = true;
+    /**
+     * Inicia movimiento hacia la derecha
+     */
+    public void moveRight() { 
+        movingRight = true; 
     }
     
+    /**
+     * Detiene todo movimiento horizontal
+     */
     public void stopMoving() {
         movingLeft = false;
         movingRight = false;
     }
     
     /**
-    * Pierde una vida
-    */
+     * Realiza un salto si está en el suelo
+     */
+    public void jump() {
+        if (onGround) {
+            velocityY = JUMP_FORCE;
+            onGround = false;
+            System.out.println("[PLAYER #" + id + "] SALTO");
+        }
+    }
+    
+    // ==========================
+    // UPDATE (FÍSICA Y COLISIONES)
+    // ==========================
+    
+    /**
+     * Actualiza la lógica del jugador cada frame
+     * 
+     * Procesa:
+     * - Movimiento horizontal
+     * - Física de gravedad y salto
+     * - Colisión con plataformas
+     * - Colisión con suelo
+     * - Límites de pantalla
+     * 
+     * @param platforms Lista de plataformas para detectar colisiones
+     */
+    public void update(List<Platform> platforms) {
+        // Guardar la posición previa ANTES de mover
+        prevY = y;
+        
+        // ----------- MOVIMIENTO HORIZONTAL -----------
+        if (movingLeft) {
+            x -= WALK_SPEED;
+        }
+        if (movingRight) {
+            x += WALK_SPEED;
+        }
+        
+        // ----------- FÍSICA DE GRAVEDAD -----------
+        velocityY += GRAVITY;
+        y += (int)velocityY;
+        
+        // Aún no está en suelo (se resetea cada frame)
+        onGround = false;
+        
+        // ----------- COLISIÓN CON PLATAFORMAS -----------
+        if (platforms != null) {
+            for (Platform p : platforms) {
+                if (velocityY >= 0 && p.collides(this)) {
+                    // Aterriza encima de la plataforma
+                    y = p.getY() - HEIGHT;
+                    velocityY = 0;
+                    onGround = true;
+                    break;
+                }
+            }
+        }
+        
+        // ----------- COLISIÓN CON EL SUELO -----------
+        if (y >= FLOOR_Y) {
+            y = FLOOR_Y;
+            velocityY = 0;
+            onGround = true;
+        }
+        
+        // ----------- LÍMITES DE PANTALLA HORIZONTAL -----------
+        if (x < MIN_X) x = MIN_X;
+        if (x > MAX_X) x = MAX_X;
+    }
+    
+    // ==========================
+    // SISTEMA DE VIDAS
+    // ==========================
+    
+    /**
+     * Pierde una vida
+     */
     public void loseLive() {
-        System.out.println("[PLAYER] Jugador #" + id + " perdió una vida");
+        System.out.println("[PLAYER #" + id + "] Perdió una vida");
     }
 
     /**
@@ -57,37 +171,84 @@ public class Player {
      * @return true si tiene vidas > 0
      */
     public boolean isAlive() {
-        return true;
-    }
-
-    // Actualización del jugador cada frame
-    public void update() {
-        if (movingLeft) {
-            x -= WALK_SPEED;
-        }
-        if (movingRight) {
-            x += WALK_SPEED;
-        }
-        
-        // Limitar posición a pantalla
-        if (x < MIN_X) x = MIN_X;
-        if (x > MAX_X) x = MAX_X;
+        return true;  // TODO: Conectar con sistema de vidas real
     }
     
-    // Getters
-    public int getId() { return id; }
-    public int getX() { return x; }
-    public int getY() { return y; }
-    public int getWidth() { return WIDTH; }
-    public int getHeight() { return HEIGHT; }
+    // ==========================
+    // GETTERS
+    // ==========================
     
-    // Mensaje para enviar al cliente
+    /**
+     * Obtiene el ID del jugador
+     */
+    public int getId() { 
+        return id; 
+    }
+    
+    /**
+     * Obtiene posición X actual
+     */
+    public int getX() { 
+        return x; 
+    }
+    
+    /**
+     * Obtiene posición Y actual
+     */
+    public int getY() { 
+        return y; 
+    }
+    
+    /**
+     * Obtiene la posición Y anterior (antes de este frame)
+     */
+    public int getPrevY() { 
+        return prevY; 
+    }
+    
+    /**
+     * Obtiene el ancho del jugador
+     */
+    public int getWidth() { 
+        return WIDTH; 
+    }
+    
+    /**
+     * Obtiene el alto del jugador
+     */
+    public int getHeight() { 
+        return HEIGHT; 
+    }
+    
+    /**
+     * Verifica si el jugador está en el suelo
+     */
+    public boolean isOnGround() {
+        return onGround;
+    }
+    
+    /**
+     * Obtiene la velocidad Y actual
+     */
+    public float getVelocityY() {
+        return velocityY;
+    }
+    
+    // ==========================
+    // MENSAJES AL CLIENTE
+    // ==========================
+    
+    /**
+     * Genera el mensaje para enviar posición al cliente
+     * 
+     * Formato: "PLAYER_POS id x y"
+     */
     public String getPositionMessage() {
         return String.format("PLAYER_POS %d %d %d", id, x, y);
     }
     
     @Override
     public String toString() {
-        return "Player{" + id + ", pos=(" + x + "," + y + ")}";
+        return "Player{id=" + id + ", pos=(" + x + "," + y + "), onGround=" + onGround + "}";
     }
 }
