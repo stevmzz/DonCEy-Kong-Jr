@@ -18,6 +18,7 @@ public class Player {
     private int x;
     private int y;
     private int prevY;   
+    private boolean alive = true;
     
     // Control de movimiento
     private boolean movingLeft = false;
@@ -40,6 +41,7 @@ public class Player {
     private static final int MIN_X = 0;
     private static final int MAX_X = 1024 - WIDTH;
     private static final int FLOOR_Y = 768 - HEIGHT;
+    public static final int SCREEN_HEIGHT = 768;
     
     /**
      * Constructor del Jugador
@@ -152,6 +154,15 @@ public class Player {
         // ----------- LÍMITES DE PANTALLA HORIZONTAL -----------
         if (x < MIN_X) x = MIN_X;
         if (x > MAX_X) x = MAX_X;
+
+        // ============================================================
+        //         MUERTE: cuando la parte de abajo toca el borde
+        // ============================================================
+
+        if (y + HEIGHT >= SCREEN_HEIGHT) {
+            die();
+            GameWorld.getInstance().playerDied(id);
+        }
     }
     
     // ==========================
@@ -163,6 +174,12 @@ public class Player {
      */
     public void loseLive() {
         System.out.println("[PLAYER #" + id + "] Perdió una vida");
+    }
+
+    public void die() {
+        alive = false;
+        // Mostrar mensaje o animación de muerte si querés
+        System.out.println("Jugador " + id + " murió");
     }
 
     /**

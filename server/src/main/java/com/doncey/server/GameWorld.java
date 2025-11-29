@@ -219,6 +219,9 @@ public class GameWorld {
             // Actualizar posición del jugador pasando las plataformas
             player.update(platforms);
             
+            // Si está muerto, no enviar más posiciones
+            if (!player.isAlive()) continue;
+            
             // Enviar posición actualizada a todos los clientes
             broadcast(player.getPositionMessage());
         }
